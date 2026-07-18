@@ -1,0 +1,8 @@
+{
+  "name": "royal-brandworks",
+  "version": "1.0.0",
+  "description": "Royal Brandworks internal business management application",
+  "scripts": {
+    "dev": "npx -y serve -l 8081 ."
+  }
+}

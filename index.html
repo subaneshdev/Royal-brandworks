@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Royal Brandworks | Business Hub</title>
+    <link rel="stylesheet" href="index.css">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Supabase JS Client SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+    <!-- Desktop Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <i data-lucide="crown"></i>
+            <span>ROYAL BRANDWORKS</span>
+        </div>
+        <nav class="sidebar-nav">
+            <button class="nav-btn active" data-tab="dashboard">
+                <i data-lucide="layout-grid"></i> Financial Dashboard
+            </button>
+            <button class="nav-btn" data-tab="clients">
+                <i data-lucide="users"></i> Clients &amp; Jobs
+            </button>
+            <button class="nav-btn" data-tab="workorders">
+                <i data-lucide="file-text"></i> Work Orders
+            </button>
+            <button class="nav-btn" data-tab="tracking">
+                <i data-lucide="milestone"></i> Work Tracking
+            </button>
+            <button class="nav-btn" data-tab="gallery">
+                <i data-lucide="image"></i> Brand Gallery
+            </button>
+        </nav>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-container">
+        <!-- Top Sticky Financial Summary Strip -->
+        <header class="summary-strip">
+            <div class="summary-card stat-revenue">
+                <span class="label">REVENUE</span>
+                <span class="value" id="summary-revenue">₹ 0</span>
+            </div>
+            <div class="summary-card stat-expense">
+                <span class="label">EXPENSES</span>
+                <span class="value" id="summary-expense">₹ 0</span>
+            </div>
+            <div class="summary-card stat-profit">
+                <span class="label">NET PROFIT</span>
+                <span class="value" id="summary-profit">₹ 0</span>
+            </div>
+        </header>
+
+        <!-- View 1: Dashboard (Overall Company Financials Bento Grid) -->
+        <section class="content-view active" id="view-dashboard">
+            <div class="view-header">
+                <h2>Company Financials</h2>
+                <span class="sub-label">Circular operational performance (Reinvested Loop)</span>
+            </div>
+            
+            <!-- 3x2 Bento Grid showing the 6 overall company nodes -->
+            <div class="bento-grid dashboard-financials-grid">
+                <!-- Investment Node -->
+                <div class="financial-node-card clickable" id="node-investment">
+                    <div class="node-header">
+                        <span class="label">INVESTMENT <span class="badge-manual">Manual</span></span>
+                        <i data-lucide="wallet" class="icon-wallet"></i>
+                    </div>
+                    <span class="value" id="dash-investment">₹ 0</span>
+                    <span class="meta">Capital injected into business</span>
+                </div>
+
+                <!-- Working Capital Node -->
+                <div class="financial-node-card" id="node-working-capital">
+                    <div class="node-header">
+                        <span class="label">WORKING CAPITAL</span>
+                        <i data-lucide="piggy-bank" class="icon-wc"></i>
+                    </div>
+                    <span class="value" id="dash-working-capital">₹ 0</span>
+                    <span class="meta">Investment + Net Profit</span>
+                </div>
+
+                <!-- Running Capital Node -->
+                <div class="financial-node-card" id="node-running-capital">
+                    <div class="node-header">
+                        <span class="label">RUNNING CAPITAL</span>
+                        <i data-lucide="refresh-cw" class="icon-rc"></i>
+                    </div>
+                    <span class="value" id="dash-running-capital">₹ 0</span>
+                    <span class="meta">60% of Working Capital utilized</span>
+                </div>
+
+                <!-- Revenue Node -->
+                <div class="financial-node-card" id="node-revenue">
+                    <div class="node-header">
+                        <span class="label">REVENUE</span>
+                        <i data-lucide="trending-up" class="icon-rev"></i>
+                    </div>
+                    <span class="value success-text" id="dash-revenue">₹ 0</span>
+                    <span class="meta">Budgets of all completed projects</span>
+                </div>
+
+                <!-- Expense Node -->
+                <div class="financial-node-card clickable" id="node-expense">
+                    <div class="node-header">
+                        <span class="label">EXPENSE <span class="badge-manual">Manual</span></span>
+                        <i data-lucide="receipt" class="icon-exp"></i>
+                    </div>
+                    <span class="value danger-text" id="dash-expense">₹ 0</span>
+                    <span class="meta">Total project costs + manual base</span>
+                </div>
+
+                <!-- Net Profit Node -->
+                <div class="financial-node-card" id="node-profit">
+                    <div class="node-header">
+                        <span class="label">NET PROFIT</span>
+                        <i data-lucide="award" class="icon-prof"></i>
+                    </div>
+                    <span class="value success-text" id="dash-profit">₹ 0</span>
+                    <span class="meta">Revenue minus Expenses</span>
+                </div>
+            </div>
+
+            <!-- Loop Reinvestment indicator -->
+            <div class="loop-reinvest-banner margin-top">
+                <i data-lucide="rotate-ccw"></i>
+                <span>Profit loops back to reinvestment (Working Capital = Investment + Net Profit)</span>
+            </div>
+        </section>
+
+        <!-- View 2: Clients Directory -->
+        <section class="content-view" id="view-clients">
+            <div class="view-header-row">
+                <div class="view-header">
+                    <h2>Clients Directory</h2>
+                    <span class="sub-label">Manage clients and expand project lists</span>
+                </div>
+                <button class="btn btn-primary" id="btn-add-client">
+                    <i data-lucide="user-plus"></i> Add Client
+                </button>
+            </div>
+
+            <div class="segmented-control">
+                <button class="segment-btn active" data-client-filter="all">All Clients</button>
+                <button class="segment-btn" data-client-filter="Individual">Individuals</button>
+                <button class="segment-btn" data-client-filter="Company">Companies</button>
+            </div>
+
+            <div class="list-wrapper" id="clients-list">
+                <!-- Loaded dynamically by JS -->
+            </div>
+        </section>
+
+        <!-- View 3: Work Orders -->
+        <section class="content-view" id="view-workorders">
+            <div class="view-header-row">
+                <div class="view-header">
+                    <h2>Work Orders</h2>
+                    <span class="sub-label">Directory of all projects/jobs</span>
+                </div>
+                <button class="btn btn-primary" id="btn-add-job">
+                    <i data-lucide="plus"></i> Create Job
+                </button>
+            </div>
+
+            <div class="filter-strip">
+                <div class="select-wrapper">
+                    <select id="workorder-client-filter" class="form-select">
+                        <option value="all">All Clients</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table class="work-orders-table">
+                    <thead>
+                        <tr>
+                            <th>Project/Job</th>
+                            <th>Client</th>
+                            <th>Assigned Team</th>
+                            <th>Status</th>
+                            <th>Profit</th>
+                            <th>Date Issued</th>
+                        </tr>
+                    </thead>
+                    <tbody id="work-orders-tbody">
+                        <!-- Loaded dynamically -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- View 4: Process / Work Tracking -->
+        <section class="content-view" id="view-tracking">
+            <div class="view-header-row">
+                <div class="view-header">
+                    <h2>Work Tracking</h2>
+                    <span class="sub-label">Track project milestones and execution</span>
+                </div>
+                <button class="btn btn-primary hidden" id="btn-add-stepper-step">
+                    <i data-lucide="plus-circle"></i> Add Custom Step
+                </button>
+            </div>
+
+            <div class="tracking-layout">
+                <div class="jobs-picker">
+                    <h3>Select Project / Job</h3>
+                    <div class="jobs-picker-list" id="tracking-jobs-list">
+                        <!-- Dynamic list -->
+                    </div>
+                </div>
+
+                <div class="stepper-details-panel" id="stepper-details-panel">
+                    <div class="empty-state" id="stepper-empty-state">
+                        <i class="large-icon" data-lucide="arrow-left-right"></i>
+                        <p>Select a job from the list to view milestones.</p>
+                    </div>
+                    
+                    <div class="stepper-main-container hidden" id="stepper-active-content">
+                        <div class="stepper-milestones-column">
+                            <div class="stepper-title-row">
+                                <h3 id="stepper-job-title">Rebranding Phase 1</h3>
+                                <p id="stepper-job-subtitle">Track progress and mark milestones for Acme Corp.</p>
+                            </div>
+                            
+                            <div class="stepper-container" id="milestone-stepper">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+
+                        <div class="stepper-sidebars-column">
+                            <div class="overview-sidebar-card">
+                                <h4>Project Overview</h4>
+                                <div class="sidebar-details-grid">
+                                    <div class="detail-row">
+                                        <span class="label">Client</span>
+                                        <span class="value" id="overview-client-name">Acme Corp</span>
+                                    </div>
+                                    <div class="detail-row">
+                                        <span class="label">Start Date</span>
+                                        <span class="value" id="overview-start-date">Oct 10, 2024</span>
+                                    </div>
+                                    <div class="detail-row">
+                                        <span class="label">Deadline</span>
+                                        <span class="value" id="overview-deadline">Nov 15, 2024</span>
+                                    </div>
+                                    <div class="detail-row">
+                                        <span class="label">Status</span>
+                                        <span class="pill pill-success" id="overview-status">On Track</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="overview-sidebar-card">
+                                <h4>Budget Tracking</h4>
+                                <div class="budget-status-row">
+                                    <span class="budget-utilized" id="budget-value">₹4,500</span>
+                                    <span class="budget-total" id="budget-limit-value">/ ₹10,000</span>
+                                </div>
+                                <div class="progress-bar-container">
+                                    <div class="progress-bar-fill" id="budget-progress-bar" style="width: 45%;"></div>
+                                </div>
+                                <div class="budget-meta">
+                                    <span id="budget-utilization-percent">45% utilized</span>
+                                </div>
+                                <button class="btn btn-primary full-width margin-top" id="btn-update-job-expense" style="min-height: 36px; font-size: 13px;">
+                                    <i data-lucide="edit-3" style="width: 14px; height: 14px;"></i> Update Expense
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- View 5: Brand Gallery -->
+        <section class="content-view" id="view-gallery">
+            <div class="view-header">
+                <h2>Brand Gallery</h2>
+                <span class="sub-label">Upload and view photos under each client</span>
+            </div>
+
+            <div class="gallery-layout">
+                <div class="gallery-sidebar">
+                    <label for="gallery-client-select" class="form-label">Select Client</label>
+                    <select id="gallery-client-select" class="form-select">
+                        <!-- Loaded dynamically -->
+                    </select>
+
+                    <div class="upload-box-container margin-top">
+                        <h4>Upload Photo</h4>
+                        <form id="form-upload-gallery">
+                            <div class="form-group">
+                                <label for="gallery-file">Choose Photo</label>
+                                <input type="file" id="gallery-file" class="form-input" accept="image/*" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="gallery-caption">Caption</label>
+                                <input type="text" id="gallery-caption" class="form-input" placeholder="e.g. Completed storefront branding" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary full-width">Upload to Client</button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="gallery-main">
+                    <div class="photo-grid" id="gallery-photo-grid">
+                        <!-- Loaded dynamically -->
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Mobile Bottom Tab Bar -->
+    <nav class="mobile-nav">
+        <button class="nav-btn active" data-tab="dashboard">
+            <i data-lucide="layout-grid"></i>
+            <span>Dashboard</span>
+        </button>
+        <button class="nav-btn" data-tab="clients">
+            <i data-lucide="users"></i>
+            <span>Clients</span>
+        </button>
+        <button class="nav-btn" data-tab="workorders">
+            <i data-lucide="file-text"></i>
+            <span>Orders</span>
+        </button>
+        <button class="nav-btn" data-tab="tracking">
+            <i data-lucide="milestone"></i>
+            <span>Tracking</span>
+        </button>
+        <button class="nav-btn" data-tab="gallery">
+            <i data-lucide="image"></i>
+            <span>Gallery</span>
+        </button>
+    </nav>
+
+    <!-- Modal: Add Client -->
+    <div class="modal-overlay hidden" id="modal-client">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Add New Client</h3>
+                <button class="btn-close" id="btn-close-client-modal"><i data-lucide="x"></i></button>
+            </div>
+            <form id="form-create-client">
+                <div class="form-group">
+                    <label for="client-name">Client Name</label>
+                    <input type="text" id="client-name" class="form-input" placeholder="e.g. Girias Coimbatore" required>
+                </div>
+                <div class="form-group">
+                    <label for="client-type">Type</label>
+                    <select id="client-type" class="form-select">
+                        <option value="Company">Company</option>
+                        <option value="Individual">Individual</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="client-logo-file">Client Logo (Optional)</label>
+                    <input type="file" id="client-logo-file" class="form-input" accept="image/*">
+                </div>
+                <button type="submit" class="btn btn-primary full-width">Create Client</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Create Job / Work Order -->
+    <div class="modal-overlay hidden" id="modal-job">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Create Project / Job</h3>
+                <button class="btn-close" id="btn-close-job-modal"><i data-lucide="x"></i></button>
+            </div>
+            <form id="form-create-job">
+                <div class="form-group">
+                    <label for="job-client-id">Client</label>
+                    <select id="job-client-id" class="form-select" required>
+                        <!-- Loaded dynamically -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="job-title">Job Title</label>
+                    <input type="text" id="job-title" class="form-input" placeholder="e.g. Interior Work" required>
+                </div>
+                <div class="form-group">
+                    <label for="job-scope">Scope Summary</label>
+                    <textarea id="job-scope" class="form-input" placeholder="Describe scope..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="job-worker">Assigned Team/Worker</label>
+                    <input type="text" id="job-worker" class="form-input" placeholder="e.g. Coimbatore Fitting Crew" required>
+                </div>
+                <div class="form-group">
+                    <label for="job-budget">Job Budget (₹)</label>
+                    <input type="number" id="job-budget" class="form-input" value="0" required min="0">
+                </div>
+                <div class="form-group">
+                    <label for="job-expense">Job Expense (₹)</label>
+                    <input type="number" id="job-expense" class="form-input" value="0" required min="0">
+                </div>
+                <div class="form-group">
+                    <label for="job-profit">Estimated Profit (₹)</label>
+                    <input type="number" id="job-profit" class="form-input" value="0" required min="0">
+                </div>
+                <button type="submit" class="btn btn-primary full-width">Create Job</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Add Custom Stepper Step -->
+    <div class="modal-overlay hidden" id="modal-add-step">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Add Custom Milestone Step</h3>
+                <button class="btn-close" id="btn-close-step-modal"><i data-lucide="x"></i></button>
+            </div>
+            <form id="form-add-step">
+                <div class="form-group">
+                    <label for="new-step-name">Step Title</label>
+                    <input type="text" id="new-step-name" class="form-input" placeholder="e.g. Final Asset Delivery" required>
+                </div>
+                <div class="form-group">
+                    <label for="new-step-desc">Step Description</label>
+                    <input type="text" id="new-step-desc" class="form-input" placeholder="e.g. Export and deliver all brand assets..." required>
+                </div>
+                <button type="submit" class="btn btn-primary full-width">Add Step</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Update Job Expense -->
+    <div class="modal-overlay hidden" id="modal-update-expense">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Update Job Expense</h3>
+                <button class="btn-close" id="btn-close-expense-modal"><i data-lucide="x"></i></button>
+            </div>
+            <form id="form-update-expense">
+                <div class="form-group">
+                    <label for="update-job-expense-value">Current Expense (₹)</label>
+                    <input type="number" id="update-job-expense-value" class="form-input" required min="0">
+                </div>
+                <button type="submit" class="btn btn-primary full-width">Save Changes</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Update Manual Financial Cashflow Nodes -->
+    <div class="modal-overlay hidden" id="modal-update-cashflow">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3 id="cf-modal-title">Update Investment</h3>
+                <button class="btn-close" id="btn-close-cf-modal"><i data-lucide="x"></i></button>
+            </div>
+            <form id="form-update-cashflow">
+                <input type="hidden" id="cf-node-key">
+                <div class="form-group">
+                    <label for="cf-node-value">Value (₹)</label>
+                    <input type="number" id="cf-node-value" class="form-input" required min="0" step="0.01">
+                </div>
+                <button type="submit" class="btn btn-primary full-width">Update Value</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
