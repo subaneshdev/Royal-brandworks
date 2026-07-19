@@ -470,9 +470,16 @@ function renderTracking() {
         document.getElementById('overview-start-date').textContent = client.start_date ? new Date(client.start_date).toLocaleDateString('en-IN', dateOpt) : 'Not set';
         document.getElementById('overview-deadline').textContent = client.deadline ? new Date(client.deadline).toLocaleDateString('en-IN', dateOpt) : 'Not set';
         
+        const clientJobs = state.jobs.filter(j => j.client_id === client.id);
+        let clientStatus = 'Completed';
+        if (clientJobs.length > 0) {
+            clientStatus = clientJobs.some(j => j.status !== 'Payment') ? 'On Track' : 'Completed';
+        } else {
+            clientStatus = 'On Track';
+        }
         const statusEl = document.getElementById('overview-status');
-        statusEl.textContent = client.status || 'On Track';
-        statusEl.className = `pill ${client.status === 'On Track' ? 'pill-success' : client.status === 'Delayed' ? 'pill-danger' : 'pill-neutral'}`;
+        statusEl.textContent = clientStatus;
+        statusEl.className = `pill ${clientStatus === 'On Track' ? 'pill-success' : 'pill-neutral'}`;
 
         const utilizedVal = parseFloat(job.expense) || 0;
         const totalVal = parseFloat(job.budget) || 1;
@@ -659,7 +666,6 @@ function setupEventHandlers() {
             name,
             type,
             logo: logoBase64,
-            status: 'On Track',
             created_at: new Date().toISOString()
         };
 
