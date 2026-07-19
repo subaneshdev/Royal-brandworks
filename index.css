@@ -348,6 +348,48 @@ body {
     font-weight: 600;
 }
 
+/* Other Expenses Listing on Dashboard */
+.other-expenses-list-box {
+    background-color: var(--bg-surface);
+    border: var(--border-width) solid var(--border);
+    border-radius: var(--radius-card);
+    padding: 18px;
+}
+
+.other-expenses-list-box h3 {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--primary);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+}
+
+.other-expenses-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.other-expense-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    background-color: var(--bg-app);
+    border-radius: var(--radius-btn);
+    border: 1px solid var(--border);
+}
+
+.other-expense-row .title {
+    font-weight: 600;
+}
+
+.other-expense-row .amount {
+    font-weight: 700;
+    color: var(--danger);
+}
+
 /* Logo and Card details */
 .logo-container {
     width: 44px;
@@ -817,6 +859,35 @@ body {
     cursor: pointer;
 }
 
+/* Step Level Cost/Expense Input Styling */
+.step-expense-box {
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-weight: 600;
+    gap: 4px;
+}
+
+.step-cost-input {
+    width: 90px;
+    height: 24px;
+    padding: 2px 6px;
+    font-size: 11px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-chip);
+    font-weight: 700;
+    background-color: var(--bg-app);
+    color: var(--text-primary);
+}
+
+.step-cost-input:focus {
+    outline: none;
+    border-color: var(--accent);
+    background-color: var(--bg-surface);
+}
+
 /* Stepper Right Overview Columns */
 .stepper-sidebars-column {
     display: flex;
@@ -861,6 +932,21 @@ body {
     font-weight: 600;
 }
 
+/* Budget Section in Tracker */
+.budget-section {
+    display: flex;
+    flex-direction: column;
+}
+
+.budget-section-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    margin-bottom: 4px;
+}
+
 .budget-status-row {
     display: flex;
     align-items: baseline;
@@ -892,13 +978,18 @@ body {
 
 .progress-bar-fill {
     height: 100%;
-    background-color: var(--primary);
     transition: width 0.3s ease;
 }
 
 .budget-meta {
     font-size: 11px;
     color: var(--text-secondary);
+}
+
+.action-buttons-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 
 /* Gallery View layouts */

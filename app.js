@@ -29,6 +29,7 @@ let state = {
     clients: [],
     jobs: [],
     clientPhotos: [],
+    otherExpenses: [],
     cashflow: {},
     activeJobId: null
 };
@@ -49,6 +50,7 @@ async function refreshAllData() {
             fetchClients(),
             fetchJobs(),
             fetchClientPhotos(),
+            fetchOtherExpenses(),
             fetchCashflow()
         ]);
         
@@ -74,6 +76,11 @@ async function fetchJobs() {
 async function fetchClientPhotos() {
     const { data, error } = await supabaseClient.from('client_photos').select('*').order('created_at', { ascending: false });
     if (!error) state.clientPhotos = data || [];
+}
+
+async function fetchOtherExpenses() {
+    const { data, error } = await supabaseClient.from('other_expenses').select('*').order('created_at', { ascending: false });
+    if (!error) state.otherExpenses = data || [];
 }
 
 async function fetchCashflow() {
@@ -102,11 +109,12 @@ function recalculateFinancials() {
         .filter(j => j.status === 'Payment')
         .reduce((sum, j) => sum + parseFloat(j.budget || 0), 0);
 
-    // 2. Expense: total expenses of all projects (ongoing + completed) + manual base expense
+    // 2. Expense: total job expenses + other utility expenses + base manual expense
     const totalJobsExpense = state.jobs.reduce((sum, j) => sum + parseFloat(j.expense || 0), 0);
+    const totalOtherExpenses = state.otherExpenses.reduce((sum, e) => sum + parseFloat(e.amount || 0), 0);
     const baseExpense = state.cashflow['expense'] || 0;
-    const totalExpense = totalJobsExpense + baseExpense;
-
+    
+    const totalExpense = totalJobsExpense + totalOtherExpenses + baseExpense;
     const totalRevenue = completedJobsBudget;
     const netProfit = totalRevenue - totalExpense;
 
@@ -221,6 +229,25 @@ function renderDashboard() {
     document.getElementById('dash-revenue').textContent = formatINR(financials.revenue);
     document.getElementById('dash-expense').textContent = formatINR(financials.expense);
     document.getElementById('dash-profit').textContent = formatINR(financials.profit);
+
+    // Render other/utility expenses list
+    const otherContainer = document.getElementById('other-expenses-rows');
+    otherContainer.innerHTML = '';
+
+    if (state.otherExpenses.length === 0) {
+        otherContainer.innerHTML = '<div style="font-size: 12px; color: var(--text-secondary); text-align: center; padding: 12px;">No utility or general expenses added yet.</div>';
+        return;
+    }
+
+    state.otherExpenses.forEach(exp => {
+        const row = document.createElement('div');
+        row.className = 'other-expense-row';
+        row.innerHTML = `
+            <span class="title">${exp.description}</span>
+            <span class="amount">${formatINR(exp.amount)}</span>
+        `;
+        otherContainer.appendChild(row);
+    });
 }
 
 // View 2: Clients Directory
@@ -460,12 +487,18 @@ function renderTracking() {
                 <div class="step-indicator" onclick="toggleStep(${idx})">
                     ${step.completed ? '<i data-lucide="check" style="width: 14px; height: 14px;"></i>' : idx + 1}
                 </div>
-                <div class="step-details" onclick="toggleStep(${idx})">
-                    <div class="step-name-row">
+                <div class="step-details">
+                    <div class="step-name-row" onclick="toggleStep(${idx})">
                         <span class="step-name">${step.name}</span>
                     </div>
-                    <span class="step-desc">${step.description || ''}</span>
+                    <span class="step-desc" onclick="toggleStep(${idx})">${step.description || ''}</span>
                     ${step.completed && timestampStr ? `<span class="step-time">Completed at ${timestampStr}</span>` : ''}
+                    
+                    <!-- Inline Step Expense Input -->
+                    <div class="step-expense-box">
+                        <span>Cost: ₹</span>
+                        <input type="number" class="step-cost-input" value="${step.expense || 0}" onchange="updateStepExpense(${idx}, this.value)" onclick="event.stopPropagation()">
+                    </div>
                 </div>
                 ${!isPayment ? `<button class="btn-delete-step" onclick="event.stopPropagation(); deleteStep(${idx})"><i data-lucide="trash-2" style="width: 16px; height: 16px;"></i></button>` : ''}
             </div>
@@ -500,17 +533,52 @@ function renderTracking() {
         statusEl.textContent = clientStatus;
         statusEl.className = `pill ${clientStatus === 'On Track' ? 'pill-success' : 'pill-neutral'}`;
 
-        const utilizedVal = parseFloat(job.expense) || 0;
-        const totalVal = parseFloat(job.budget) || 1;
-        const percent = Math.min(Math.round((utilizedVal / totalVal) * 100), 100);
+        // 1. INFLOW calculations (Paid vs. Budget)
+        const inflowVal = parseFloat(job.amount_given) || 0;
+        const budgetLimitVal = parseFloat(job.budget) || 1;
+        const inflowPercent = Math.min(Math.round((inflowVal / budgetLimitVal) * 100), 100);
 
-        document.getElementById('budget-value').textContent = formatINR(utilizedVal);
-        document.getElementById('budget-limit-value').textContent = `/ ${formatINR(totalVal)}`;
-        document.getElementById('budget-progress-bar').style.width = `${percent}%`;
-        document.getElementById('budget-utilization-percent').textContent = `${percent}% utilized`;
+        document.getElementById('inflow-value').textContent = formatINR(inflowVal);
+        document.getElementById('inflow-limit-value').textContent = `/ ${formatINR(budgetLimitVal)}`;
+        document.getElementById('inflow-progress-bar').style.width = `${inflowPercent}%`;
+        document.getElementById('inflow-percent').textContent = `${inflowPercent}% collected`;
+
+        // 2. OUTFLOW / EXPENSE calculations
+        const expenseVal = parseFloat(job.expense) || 0;
+        const expensePercent = Math.min(Math.round((expenseVal / budgetLimitVal) * 100), 100);
+
+        document.getElementById('expense-value').textContent = formatINR(expenseVal);
+        document.getElementById('expense-limit-value').textContent = `/ ${formatINR(budgetLimitVal)}`;
+        document.getElementById('expense-progress-bar').style.width = `${expensePercent}%`;
+        document.getElementById('expense-percent').textContent = `${expensePercent}% utilized`;
     }
     lucide.createIcons();
 }
+
+window.updateStepExpense = async function(stepIndex, val) {
+    if (!state.activeJobId) return;
+    const job = state.jobs.find(j => j.id === state.activeJobId);
+    if (!job) return;
+
+    const steps = [...job.milestone_steps];
+    steps[stepIndex].expense = parseFloat(val) || 0;
+
+    const newExpense = steps.reduce((sum, s) => sum + (parseFloat(s.expense) || 0), 0);
+
+    // Auto-recalculate profit
+    let newProfit = parseFloat(job.budget || 0) - newExpense;
+
+    try {
+        const { error } = await supabaseClient
+            .from('jobs')
+            .update({ milestone_steps: steps, expense: newExpense, profit: newProfit })
+            .eq('id', job.id);
+        if (error) throw error;
+    } catch (e) {
+        console.error("Update step expense failed", e);
+    }
+    await refreshAllData();
+};
 
 window.toggleStep = async function(stepIndex) {
     if (!state.activeJobId) return;
@@ -703,7 +771,7 @@ function setupEventHandlers() {
         await refreshAllData();
     });
 
-    // Create Job Modal Triggers (Varying triggers across pages)
+    // Create Job Modal Triggers
     document.getElementById('btn-add-job').addEventListener('click', () => {
         document.getElementById('modal-job').classList.remove('hidden');
     });
@@ -731,13 +799,14 @@ function setupEventHandlers() {
             profit: profit,
             budget: budget,
             expense: expense,
+            amount_given: 0.00, // Initial inflow is 0
             status: 'Initial Consultation',
             date_issued: new Date().toISOString(),
             milestone_steps: [
-                {"name": "Initial Consultation", "completed": true, "timestamp": new Date().toISOString(), "description": "Client meeting to discuss requirements and scope."},
-                {"name": "Design Drafts Submitted", "completed": false, "timestamp": null, "description": "First round of concepts sent for review."},
-                {"name": "Client Revisions", "completed": false, "timestamp": null, "description": "Implement feedback from review sessions."},
-                {"name": "Payment", "completed": false, "timestamp": null, "description": "Final invoice generation and payment confirmation."}
+                {"name": "Initial Consultation", "completed": true, "timestamp": new Date().toISOString(), "description": "Client meeting to discuss requirements and scope.", "expense": 0},
+                {"name": "Design Drafts Submitted", "completed": false, "timestamp": null, "description": "First round of concepts sent for review.", "expense": 0},
+                {"name": "Client Revisions", "completed": false, "timestamp": null, "description": "Implement feedback from review sessions.", "expense": 0},
+                {"name": "Payment", "completed": false, "timestamp": null, "description": "Final invoice generation and payment confirmation.", "expense": 0}
             ]
         };
 
@@ -781,7 +850,8 @@ function setupEventHandlers() {
             name: name,
             completed: false,
             timestamp: null,
-            description: description
+            description: description,
+            expense: 0
         };
 
         const insertIndex = Math.max(steps.length - 1, 0);
@@ -802,7 +872,7 @@ function setupEventHandlers() {
         await refreshAllData();
     });
 
-    // Update Job Expense Modal triggers
+    // Edit Project Expense Modal triggers (Fallback direct edit)
     document.getElementById('btn-update-job-expense').addEventListener('click', () => {
         if (!state.activeJobId) return;
         const job = state.jobs.find(j => j.id === state.activeJobId);
@@ -834,6 +904,41 @@ function setupEventHandlers() {
         }
 
         document.getElementById('modal-update-expense').classList.add('hidden');
+        await refreshAllData();
+    });
+
+    // Update Paid Inflow Modal triggers
+    document.getElementById('btn-update-paid-inflow').addEventListener('click', () => {
+        if (!state.activeJobId) return;
+        const job = state.jobs.find(j => j.id === state.activeJobId);
+        if (!job) return;
+
+        document.getElementById('update-job-inflow-value').value = job.amount_given || 0;
+        document.getElementById('modal-update-inflow').classList.remove('hidden');
+    });
+
+    document.getElementById('btn-close-inflow-modal').addEventListener('click', () => {
+        document.getElementById('modal-update-inflow').classList.add('hidden');
+    });
+
+    document.getElementById('form-update-inflow').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!state.activeJobId) return;
+
+        const inflowVal = parseFloat(document.getElementById('update-job-inflow-value').value) || 0;
+
+        try {
+            const { error } = await supabaseClient
+                .from('jobs')
+                .update({ amount_given: inflowVal })
+                .eq('id', state.activeJobId);
+            if (error) throw error;
+        } catch (err) {
+            console.error("Update inflow error:", err);
+            alert("Error updating inflow: " + err.message);
+        }
+
+        document.getElementById('modal-update-inflow').classList.add('hidden');
         await refreshAllData();
     });
 
@@ -874,6 +979,35 @@ function setupEventHandlers() {
         }
 
         document.getElementById('modal-update-cashflow').classList.add('hidden');
+        await refreshAllData();
+    });
+
+    // Create General/Utility Expense trigger
+    document.getElementById('btn-add-other-expense').addEventListener('click', () => {
+        document.getElementById('modal-other-expense').classList.remove('hidden');
+    });
+
+    document.getElementById('btn-close-other-expense-modal').addEventListener('click', () => {
+        document.getElementById('modal-other-expense').classList.add('hidden');
+    });
+
+    document.getElementById('form-create-other-expense').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const desc = document.getElementById('other-expense-desc').value;
+        const amt = parseFloat(document.getElementById('other-expense-amount').value) || 0;
+
+        try {
+            const { error } = await supabaseClient
+                .from('other_expenses')
+                .insert([{ description: desc, amount: amt }]);
+            if (error) throw error;
+        } catch (err) {
+            console.error("Add other expense error:", err);
+            alert("Error adding expense: " + err.message);
+        }
+
+        document.getElementById('modal-other-expense').classList.add('hidden');
+        document.getElementById('form-create-other-expense').reset();
         await refreshAllData();
     });
 
