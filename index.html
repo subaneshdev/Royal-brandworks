@@ -62,25 +62,30 @@
                     <h2>Company Financials</h2>
                     <span class="sub-label">Circular operational performance (Reinvested Loop)</span>
                 </div>
-                <button class="btn btn-primary" id="btn-add-other-expense">
-                    <i data-lucide="plus"></i> Add Utility / Other Expense
-                </button>
+                <div class="action-buttons-group-row">
+                    <button class="btn btn-primary" id="btn-add-investment-dash">
+                        <i data-lucide="wallet"></i> + Add Investment
+                    </button>
+                    <button class="btn btn-danger" id="btn-add-utility-dash">
+                        <i data-lucide="receipt"></i> + Add Utility Expense
+                    </button>
+                </div>
             </div>
             
             <!-- 3x2 Bento Grid showing the 6 overall company nodes -->
             <div class="bento-grid dashboard-financials-grid">
                 <!-- Investment Node -->
-                <div class="financial-node-card clickable" id="node-investment">
+                <div class="financial-node-card">
                     <div class="node-header">
-                        <span class="label">INVESTMENT <span class="badge-manual">Manual</span></span>
+                        <span class="label">INVESTMENT</span>
                         <i data-lucide="wallet" class="icon-wallet"></i>
                     </div>
                     <span class="value" id="dash-investment">₹ 0</span>
-                    <span class="meta">Capital injected into business</span>
+                    <span class="meta">Total capital injected</span>
                 </div>
 
                 <!-- Working Capital Node -->
-                <div class="financial-node-card" id="node-working-capital">
+                <div class="financial-node-card">
                     <div class="node-header">
                         <span class="label">WORKING CAPITAL</span>
                         <i data-lucide="piggy-bank" class="icon-wc"></i>
@@ -90,37 +95,37 @@
                 </div>
 
                 <!-- Running Capital Node -->
-                <div class="financial-node-card" id="node-running-capital">
+                <div class="financial-node-card">
                     <div class="node-header">
                         <span class="label">RUNNING CAPITAL</span>
                         <i data-lucide="refresh-cw" class="icon-rc"></i>
                     </div>
                     <span class="value" id="dash-running-capital">₹ 0</span>
-                    <span class="meta">60% of Working Capital utilized</span>
+                    <span class="meta">60% of Working Capital</span>
                 </div>
 
                 <!-- Revenue Node -->
-                <div class="financial-node-card" id="node-revenue">
+                <div class="financial-node-card">
                     <div class="node-header">
                         <span class="label">REVENUE</span>
                         <i data-lucide="trending-up" class="icon-rev"></i>
                     </div>
                     <span class="value success-text" id="dash-revenue">₹ 0</span>
-                    <span class="meta">Budgets of all completed projects</span>
+                    <span class="meta">Total Client Payments (Inflow)</span>
                 </div>
 
                 <!-- Expense Node -->
-                <div class="financial-node-card clickable" id="node-expense">
+                <div class="financial-node-card">
                     <div class="node-header">
-                        <span class="label">EXPENSE <span class="badge-manual">Manual</span></span>
+                        <span class="label">EXPENSE</span>
                         <i data-lucide="receipt" class="icon-exp"></i>
                     </div>
                     <span class="value danger-text" id="dash-expense">₹ 0</span>
-                    <span class="meta">Total project costs + manual base</span>
+                    <span class="meta">Job costs + Utility expenses</span>
                 </div>
 
                 <!-- Net Profit Node -->
-                <div class="financial-node-card" id="node-profit">
+                <div class="financial-node-card">
                     <div class="node-header">
                         <span class="label">NET PROFIT</span>
                         <i data-lucide="award" class="icon-prof"></i>
@@ -136,11 +141,24 @@
                 <span>Profit loops back to reinvestment (Working Capital = Investment + Net Profit)</span>
             </div>
 
-            <!-- Other General Expenses Sub-section -->
+            <!-- Unified Transaction History List -->
             <div class="other-expenses-list-box margin-top">
-                <h3>Utility &amp; Other Expenses</h3>
-                <div class="other-expenses-container" id="other-expenses-rows">
-                    <!-- Loaded dynamically -->
+                <h3>Global Transaction Ledger</h3>
+                <div class="ledger-table-container">
+                    <table class="ledger-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Description / Job</th>
+                                <th>Type</th>
+                                <th>Method</th>
+                                <th>Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody id="global-ledger-tbody">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </section>
@@ -196,7 +214,7 @@
                             <th>Client</th>
                             <th>Assigned Team</th>
                             <th>Status</th>
-                            <th>Profit</th>
+                            <th>Est. Profit</th>
                             <th>Date Issued</th>
                         </tr>
                     </thead>
@@ -246,36 +264,32 @@
                         </div>
 
                         <div class="stepper-sidebars-column">
-                            <!-- Project Overview Sidebar -->
+                            <!-- Project Quotation Overview -->
                             <div class="overview-sidebar-card">
-                                <h4>Project Overview</h4>
+                                <h4>Project Budget (Quotation)</h4>
                                 <div class="sidebar-details-grid">
                                     <div class="detail-row">
-                                        <span class="label">Client</span>
-                                        <span class="value" id="overview-client-name">Acme Corp</span>
+                                        <span class="label font-bold">Quotation</span>
+                                        <span class="value success-text font-bold" id="sidebar-est-budget">₹0</span>
                                     </div>
                                     <div class="detail-row">
-                                        <span class="label">Start Date</span>
-                                        <span class="value" id="overview-start-date">Oct 10, 2024</span>
+                                        <span class="label">Est. Expense</span>
+                                        <span class="value danger-text" id="sidebar-est-expense">₹0</span>
                                     </div>
                                     <div class="detail-row">
-                                        <span class="label">Deadline</span>
-                                        <span class="value" id="overview-deadline">Nov 15, 2024</span>
-                                    </div>
-                                    <div class="detail-row">
-                                        <span class="label">Status</span>
-                                        <span class="pill pill-success" id="overview-status">On Track</span>
+                                        <span class="label">Est. Net Profit</span>
+                                        <span class="value" id="sidebar-est-profit">₹0</span>
                                     </div>
                                 </div>
                             </div>
 
-                            <!-- Budget / Inflow / Outflow Sidebar -->
+                            <!-- Real-time Financial Ledger Progress -->
                             <div class="overview-sidebar-card">
-                                <h4>Budget Tracker</h4>
+                                <h4>Actual Cashflow (Ledger)</h4>
                                 
                                 <!-- INFLOW SECTION (Paid by Client) -->
                                 <div class="budget-section">
-                                    <span class="budget-section-label">IN (Client Inflow / Given)</span>
+                                    <span class="budget-section-label">IN (Amount Given / Inflow)</span>
                                     <div class="budget-status-row">
                                         <span class="budget-utilized" id="inflow-value" style="color: var(--success);">₹0</span>
                                         <span class="budget-total" id="inflow-limit-value">/ ₹0</span>
@@ -290,7 +304,7 @@
 
                                 <!-- OUTFLOW SECTION (Expenses) -->
                                 <div class="budget-section margin-top">
-                                    <span class="budget-section-label">OUT (Incurred Expenses)</span>
+                                    <span class="budget-section-label">OUT (Actual Expenses)</span>
                                     <div class="budget-status-row">
                                         <span class="budget-utilized" id="expense-value" style="color: var(--danger);">₹0</span>
                                         <span class="budget-total" id="expense-limit-value">/ ₹0</span>
@@ -303,13 +317,27 @@
                                     </div>
                                 </div>
 
+                                <!-- Dynamic Actual Net Profit -->
+                                <div class="actual-profit-row margin-top">
+                                    <span class="label">Actual Net Profit:</span>
+                                    <span class="value success-text font-bold" id="actual-net-profit">₹0</span>
+                                </div>
+
                                 <div class="action-buttons-group margin-top">
-                                    <button class="btn btn-primary full-width" id="btn-update-paid-inflow" style="min-height: 36px; font-size: 12px; margin-bottom: 8px;">
-                                        <i data-lucide="plus" style="width: 14px; height: 14px;"></i> Update Paid Inflow
+                                    <button class="btn btn-primary full-width" id="btn-record-inflow" style="min-height: 36px; font-size: 12px; margin-bottom: 8px;">
+                                        <i data-lucide="plus" style="width: 14px; height: 14px;"></i> Record Inflow (IN)
                                     </button>
-                                    <button class="btn btn-danger full-width" id="btn-update-job-expense" style="min-height: 36px; font-size: 12px;">
-                                        <i data-lucide="edit-3" style="width: 14px; height: 14px;"></i> Edit Project Expense
+                                    <button class="btn btn-danger full-width" id="btn-record-outflow" style="min-height: 36px; font-size: 12px;">
+                                        <i data-lucide="minus" style="width: 14px; height: 14px;"></i> Record Expense (OUT)
                                     </button>
+                                </div>
+                            </div>
+
+                            <!-- Transaction Ledger under this Job -->
+                            <div class="overview-sidebar-card">
+                                <h4>Job Ledger History</h4>
+                                <div class="job-ledger-list" id="job-ledger-history">
+                                    <!-- Populated dynamically -->
                                 </div>
                             </div>
                         </div>
@@ -436,11 +464,11 @@
                     <input type="text" id="job-worker" class="form-input" placeholder="e.g. Coimbatore Fitting Crew" required>
                 </div>
                 <div class="form-group">
-                    <label for="job-budget">Job Budget (₹)</label>
+                    <label for="job-budget">Job Budget / Quotation (₹)</label>
                     <input type="number" id="job-budget" class="form-input" value="0" required min="0">
                 </div>
                 <div class="form-group">
-                    <label for="job-expense">Job Expense (₹)</label>
+                    <label for="job-expense">Estimated Job Expense (₹)</label>
                     <input type="number" id="job-expense" class="form-input" value="0" required min="0">
                 </div>
                 <div class="form-group">
@@ -473,75 +501,67 @@
         </div>
     </div>
 
-    <!-- Modal: Update Job Expense -->
-    <div class="modal-overlay hidden" id="modal-update-expense">
+    <!-- Modal: Record Unified Transaction -->
+    <div class="modal-overlay hidden" id="modal-add-transaction">
         <div class="modal-box">
             <div class="modal-header">
-                <h3>Update Job Expense</h3>
-                <button class="btn-close" id="btn-close-expense-modal"><i data-lucide="x"></i></button>
+                <h3 id="transaction-modal-title">Record Transaction</h3>
+                <button class="btn-close" id="btn-close-transaction-modal"><i data-lucide="x"></i></button>
             </div>
-            <form id="form-update-expense">
+            <form id="form-add-transaction">
+                <input type="hidden" id="transaction-type">
+                <input type="hidden" id="transaction-job-id">
+                
                 <div class="form-group">
-                    <label for="update-job-expense-value">Current Expense (₹)</label>
-                    <input type="number" id="update-job-expense-value" class="form-input" required min="0">
+                    <label for="transaction-name">Name / Description</label>
+                    <input type="text" id="transaction-name" class="form-input" placeholder="e.g. UPI received from client, Electricity bill, etc." required>
                 </div>
-                <button type="submit" class="btn btn-primary full-width">Save Changes</button>
-            </form>
-        </div>
-    </div>
+                
+                <div class="form-group">
+                    <label for="transaction-amount">Amount (₹)</label>
+                    <input type="number" id="transaction-amount" class="form-input" placeholder="0" required min="0" step="0.01">
+                </div>
 
-    <!-- Modal: Update Inflow (Paid by Client) -->
-    <div class="modal-overlay hidden" id="modal-update-inflow">
-        <div class="modal-box">
-            <div class="modal-header">
-                <h3>Update Client Paid Inflow</h3>
-                <button class="btn-close" id="btn-close-inflow-modal"><i data-lucide="x"></i></button>
-            </div>
-            <form id="form-update-inflow">
                 <div class="form-group">
-                    <label for="update-job-inflow-value">Amount Given so Far (₹)</label>
-                    <input type="number" id="update-job-inflow-value" class="form-input" required min="0">
+                    <label class="form-label">Payment Method</label>
+                    <div class="payment-method-selector">
+                        <label class="method-option">
+                            <input type="radio" name="payment_method" value="Cash" checked>
+                            <div class="option-card">
+                                <i data-lucide="banknote"></i>
+                                <span>Cash</span>
+                            </div>
+                        </label>
+                        <label class="method-option">
+                            <input type="radio" name="payment_method" value="UPI">
+                            <div class="option-card">
+                                <i data-lucide="smartphone"></i>
+                                <span>UPI</span>
+                            </div>
+                        </label>
+                        <label class="method-option">
+                            <input type="radio" name="payment_method" value="Card">
+                            <div class="option-card">
+                                <i data-lucide="credit-card"></i>
+                                <span>Card</span>
+                            </div>
+                        </label>
+                        <label class="method-option">
+                            <input type="radio" name="payment_method" value="Cheque">
+                            <div class="option-card">
+                                <i data-lucide="file-text"></i>
+                                <span>Cheque</span>
+                            </div>
+                        </label>
+                    </div>
                 </div>
-                <button type="submit" class="btn btn-primary full-width">Save Changes</button>
-            </form>
-        </div>
-    </div>
 
-    <!-- Modal: Update Manual Financial Cashflow Nodes -->
-    <div class="modal-overlay hidden" id="modal-update-cashflow">
-        <div class="modal-box">
-            <div class="modal-header">
-                <h3 id="cf-modal-title">Update Investment</h3>
-                <button class="btn-close" id="btn-close-cf-modal"><i data-lucide="x"></i></button>
-            </div>
-            <form id="form-update-cashflow">
-                <input type="hidden" id="cf-node-key">
                 <div class="form-group">
-                    <label for="cf-node-value">Value (₹)</label>
-                    <input type="number" id="cf-node-value" class="form-input" required min="0" step="0.01">
+                    <label for="transaction-date">Transaction Date (Optional)</label>
+                    <input type="datetime-local" id="transaction-date" class="form-input">
                 </div>
-                <button type="submit" class="btn btn-primary full-width">Update Value</button>
-            </form>
-        </div>
-    </div>
 
-    <!-- Modal: Create General/Utility Expense -->
-    <div class="modal-overlay hidden" id="modal-other-expense">
-        <div class="modal-box">
-            <div class="modal-header">
-                <h3>Add Utility / General Expense</h3>
-                <button class="btn-close" id="btn-close-other-expense-modal"><i data-lucide="x"></i></button>
-            </div>
-            <form id="form-create-other-expense">
-                <div class="form-group">
-                    <label for="other-expense-desc">Description</label>
-                    <input type="text" id="other-expense-desc" class="form-input" placeholder="e.g. Electricity Bill July" required>
-                </div>
-                <div class="form-group">
-                    <label for="other-expense-amount">Amount (₹)</label>
-                    <input type="number" id="other-expense-amount" class="form-input" required min="0" step="0.01">
-                </div>
-                <button type="submit" class="btn btn-primary full-width">Add Expense</button>
+                <button type="submit" class="btn btn-primary full-width">Add Transaction</button>
             </form>
         </div>
     </div>

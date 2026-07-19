@@ -29,8 +29,7 @@ let state = {
     clients: [],
     jobs: [],
     clientPhotos: [],
-    otherExpenses: [],
-    cashflow: {},
+    transactions: [],
     activeJobId: null
 };
 
@@ -50,8 +49,7 @@ async function refreshAllData() {
             fetchClients(),
             fetchJobs(),
             fetchClientPhotos(),
-            fetchOtherExpenses(),
-            fetchCashflow()
+            fetchTransactions()
         ]);
         
         recalculateFinancials();
@@ -78,20 +76,9 @@ async function fetchClientPhotos() {
     if (!error) state.clientPhotos = data || [];
 }
 
-async function fetchOtherExpenses() {
-    const { data, error } = await supabaseClient.from('other_expenses').select('*').order('created_at', { ascending: false });
-    if (!error) state.otherExpenses = data || [];
-}
-
-async function fetchCashflow() {
-    const { data, error } = await supabaseClient.from('cashflow').select('*');
-    if (!error && data) {
-        const cfMap = {};
-        data.forEach(item => {
-            cfMap[item.id] = parseFloat(item.value);
-        });
-        state.cashflow = cfMap;
-    }
+async function fetchTransactions() {
+    const { data, error } = await supabaseClient.from('transactions').select('*').order('date', { ascending: false });
+    if (!error) state.transactions = data || [];
 }
 
 // Financial calculations
@@ -104,27 +91,28 @@ function getClientRollup(clientId) {
 }
 
 function recalculateFinancials() {
-    // 1. Revenue: budgets of all completed projects (where status is 'Payment')
-    const completedJobsBudget = state.jobs
-        .filter(j => j.status === 'Payment')
-        .reduce((sum, j) => sum + parseFloat(j.budget || 0), 0);
+    // 1. Revenue: sum of all Job Inflow transactions
+    const totalRevenue = state.transactions
+        .filter(t => t.type === 'Job Inflow')
+        .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
 
-    // 2. Expense: total job expenses + other utility expenses + base manual expense
-    const totalJobsExpense = state.jobs.reduce((sum, j) => sum + parseFloat(j.expense || 0), 0);
-    const totalOtherExpenses = state.otherExpenses.reduce((sum, e) => sum + parseFloat(e.amount || 0), 0);
-    const baseExpense = state.cashflow['expense'] || 0;
-    
-    const totalExpense = totalJobsExpense + totalOtherExpenses + baseExpense;
-    const totalRevenue = completedJobsBudget;
+    // 2. Expense: sum of all Job Expense + Other Expense transactions
+    const totalExpense = state.transactions
+        .filter(t => t.type === 'Job Expense' || t.type === 'Other Expense')
+        .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
+
+    // 3. Net Profit = Revenue - Expense
     const netProfit = totalRevenue - totalExpense;
 
-    // 3. Investment (manual entry)
-    const investment = state.cashflow['investment'] || 0;
+    // 4. Investment: sum of all Investment transactions
+    const investment = state.transactions
+        .filter(t => t.type === 'Investment')
+        .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
 
-    // 4. Working Capital = Investment + Net Profit
+    // 5. Working Capital = Investment + Net Profit
     const workingCapital = investment + netProfit;
 
-    // 5. Running Capital = 60% of Working Capital
+    // 6. Running Capital = 60% of Working Capital
     const runningCapital = workingCapital * 0.6;
 
     // Save calculations into state
@@ -161,6 +149,17 @@ function fileToBase64(file) {
         reader.onload = () => resolve(reader.result);
         reader.onerror = error => reject(error);
     });
+}
+
+// Helper for Lucide icons mapping for Payment Methods
+function getPaymentMethodIcon(method) {
+    switch (method) {
+        case 'Cash': return 'banknote';
+        case 'UPI': return 'smartphone';
+        case 'Card': return 'credit-card';
+        case 'Cheque': return 'file-text';
+        default: return 'help-circle';
+    }
 }
 
 // Tab Switching Navigation
@@ -218,7 +217,7 @@ function renderActiveView() {
     lucide.createIcons();
 }
 
-// View 1: Dashboard overall financials
+// View 1: Dashboard overall financials & Global Ledger
 function renderDashboard() {
     const financials = state.overallFinancials;
     if (!financials) return;
@@ -230,23 +229,36 @@ function renderDashboard() {
     document.getElementById('dash-expense').textContent = formatINR(financials.expense);
     document.getElementById('dash-profit').textContent = formatINR(financials.profit);
 
-    // Render other/utility expenses list
-    const otherContainer = document.getElementById('other-expenses-rows');
-    otherContainer.innerHTML = '';
+    // Populate Global Transaction Ledger
+    const tbody = document.getElementById('global-ledger-tbody');
+    tbody.innerHTML = '';
 
-    if (state.otherExpenses.length === 0) {
-        otherContainer.innerHTML = '<div style="font-size: 12px; color: var(--text-secondary); text-align: center; padding: 12px;">No utility or general expenses added yet.</div>';
+    if (state.transactions.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: var(--text-secondary);">No transactions recorded yet.</td></tr>';
         return;
     }
 
-    state.otherExpenses.forEach(exp => {
-        const row = document.createElement('div');
-        row.className = 'other-expense-row';
-        row.innerHTML = `
-            <span class="title">${exp.description}</span>
-            <span class="amount">${formatINR(exp.amount)}</span>
+    state.transactions.forEach(t => {
+        const job = state.jobs.find(j => j.id === t.job_id);
+        const jobSuffix = job ? ` (${job.title})` : '';
+        const iconName = getPaymentMethodIcon(t.payment_method);
+        
+        const dateStr = new Date(t.date).toLocaleDateString('en-IN', {
+            day: '2-digit',
+            month: 'short',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${dateStr}</td>
+            <td><strong>${t.name}</strong>${jobSuffix}</td>
+            <td><span class="pill ${t.type.includes('Inflow') || t.type.includes('Investment') ? 'pill-success' : 'pill-danger'}">${t.type}</span></td>
+            <td><span class="method-tag" style="font-size: 11px;"><i data-lucide="${iconName}" style="width: 12px; height: 12px; vertical-align: middle; margin-right: 2px;"></i>${t.payment_method}</span></td>
+            <td><span class="${t.type.includes('Inflow') || t.type.includes('Investment') ? 'success-text' : 'danger-text'}" style="font-weight: 700;">${formatINR(t.amount)}</span></td>
         `;
-        otherContainer.appendChild(row);
+        tbody.appendChild(tr);
     });
 }
 
@@ -406,7 +418,7 @@ function renderWorkOrders() {
             <td>${clientName}</td>
             <td>${job.assigned_worker}</td>
             <td><span class="pill ${job.status === 'Payment' ? 'pill-success' : 'pill-warning'}">${job.status}</span></td>
-            <td><span style="color: var(--success); font-weight: 700; font-variant-numeric: tabular-nums;">${formatINR(job.profit)}</span></td>
+            <td><span style="color: var(--success); font-weight: 700; font-variant-numeric: tabular-nums;">${formatINR(job.budget - job.expense)}</span></td>
             <td>${dateStr}</td>
         `;
         tr.addEventListener('click', () => {
@@ -533,24 +545,59 @@ function renderTracking() {
         statusEl.textContent = clientStatus;
         statusEl.className = `pill ${clientStatus === 'On Track' ? 'pill-success' : 'pill-neutral'}`;
 
-        // 1. INFLOW calculations (Paid vs. Budget)
-        const inflowVal = parseFloat(job.amount_given) || 0;
-        const budgetLimitVal = parseFloat(job.budget) || 1;
-        const inflowPercent = Math.min(Math.round((inflowVal / budgetLimitVal) * 100), 100);
+        // Dynamic Calculations from Transactions belonging to this Job
+        const jobTransactions = state.transactions.filter(t => t.job_id === job.id);
+        const inflowVal = jobTransactions.filter(t => t.type === 'Job Inflow').reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
+        const actualExpenseVal = jobTransactions.filter(t => t.type === 'Job Expense').reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
 
+        // Sidebar Quotation Stats
+        const quotation = parseFloat(job.budget) || 0;
+        const estExpense = parseFloat(job.expense) || 0;
+        document.getElementById('sidebar-est-budget').textContent = formatINR(quotation);
+        document.getElementById('sidebar-est-expense').textContent = formatINR(estExpense);
+        document.getElementById('sidebar-est-profit').textContent = formatINR(quotation - estExpense);
+
+        // 1. INFLOW (IN) - Paid by Client vs Total Quotation
+        const inflowPercent = Math.min(Math.round((inflowVal / (quotation || 1)) * 100), 100);
         document.getElementById('inflow-value').textContent = formatINR(inflowVal);
-        document.getElementById('inflow-limit-value').textContent = `/ ${formatINR(budgetLimitVal)}`;
+        document.getElementById('inflow-limit-value').textContent = `/ ${formatINR(quotation)}`;
         document.getElementById('inflow-progress-bar').style.width = `${inflowPercent}%`;
         document.getElementById('inflow-percent').textContent = `${inflowPercent}% collected`;
 
-        // 2. OUTFLOW / EXPENSE calculations
-        const expenseVal = parseFloat(job.expense) || 0;
-        const expensePercent = Math.min(Math.round((expenseVal / budgetLimitVal) * 100), 100);
-
-        document.getElementById('expense-value').textContent = formatINR(expenseVal);
-        document.getElementById('expense-limit-value').textContent = `/ ${formatINR(budgetLimitVal)}`;
+        // 2. OUTFLOW (OUT) - Expenses incurred vs Total Inflow
+        const expensePercent = Math.min(Math.round((actualExpenseVal / (quotation || 1)) * 100), 100);
+        document.getElementById('expense-value').textContent = formatINR(actualExpenseVal);
+        document.getElementById('expense-limit-value').textContent = `/ ${formatINR(quotation)}`;
         document.getElementById('expense-progress-bar').style.width = `${expensePercent}%`;
         document.getElementById('expense-percent').textContent = `${expensePercent}% utilized`;
+
+        // Actual Net Profit = Inflow - Outflow
+        const actualNetProfit = inflowVal - actualExpenseVal;
+        const profitEl = document.getElementById('actual-net-profit');
+        profitEl.textContent = formatINR(actualNetProfit);
+        profitEl.className = actualNetProfit >= 0 ? 'value success-text font-bold' : 'value danger-text font-bold';
+
+        // Render Job-specific Ledger History List
+        const jobLedger = document.getElementById('job-ledger-history');
+        jobLedger.innerHTML = '';
+        if (jobTransactions.length === 0) {
+            jobLedger.innerHTML = '<div style="font-size: 11px; color: var(--text-secondary); text-align: center; padding: 10px;">No cash transfers recorded.</div>';
+        } else {
+            jobTransactions.forEach(t => {
+                const iconName = getPaymentMethodIcon(t.payment_method);
+                const isPositive = t.type === 'Job Inflow';
+                const row = document.createElement('div');
+                row.className = 'job-ledger-row';
+                row.innerHTML = `
+                    <div class="left-desc">
+                        <strong>${t.name}</strong>
+                        <span class="method-tag"><i data-lucide="${iconName}" style="width: 10px; height: 10px;"></i>${t.payment_method}</span>
+                    </div>
+                    <span class="val-amt ${isPositive ? 'success-text' : 'danger-text'}">${isPositive ? '+' : '-'}${formatINR(t.amount)}</span>
+                `;
+                jobLedger.appendChild(row);
+            });
+        }
     }
     lucide.createIcons();
 }
@@ -565,7 +612,7 @@ window.updateStepExpense = async function(stepIndex, val) {
 
     const newExpense = steps.reduce((sum, s) => sum + (parseFloat(s.expense) || 0), 0);
 
-    // Auto-recalculate profit
+    // Auto-recalculate estimated profit
     let newProfit = parseFloat(job.budget || 0) - newExpense;
 
     try {
@@ -599,7 +646,6 @@ window.toggleStep = async function(stepIndex) {
         }
     }
 
-    // Auto-calculate profit = budget - expense if terminal Payment step is checked/completed
     let newProfit = parseFloat(job.profit) || 0;
     if (newStatus === 'Payment') {
         newProfit = (parseFloat(job.budget) || 0) - (parseFloat(job.expense) || 0);
@@ -799,7 +845,7 @@ function setupEventHandlers() {
             profit: profit,
             budget: budget,
             expense: expense,
-            amount_given: 0.00, // Initial inflow is 0
+            amount_given: 0.00,
             status: 'Initial Consultation',
             date_issued: new Date().toISOString(),
             milestone_steps: [
@@ -872,142 +918,67 @@ function setupEventHandlers() {
         await refreshAllData();
     });
 
-    // Edit Project Expense Modal triggers (Fallback direct edit)
-    document.getElementById('btn-update-job-expense').addEventListener('click', () => {
+    // Open Unified Transaction Modals
+    document.getElementById('btn-add-investment-dash').addEventListener('click', () => {
+        openTransactionModal('Investment', 'Investment Capital Injection', null);
+    });
+
+    document.getElementById('btn-add-utility-dash').addEventListener('click', () => {
+        openTransactionModal('Other Expense', 'Utility / General Expense', null);
+    });
+
+    document.getElementById('btn-record-inflow').addEventListener('click', () => {
         if (!state.activeJobId) return;
         const job = state.jobs.find(j => j.id === state.activeJobId);
-        if (!job) return;
-
-        document.getElementById('update-job-expense-value').value = job.expense || 0;
-        document.getElementById('modal-update-expense').classList.remove('hidden');
+        openTransactionModal('Job Inflow', `Client Payment received for ${job ? job.title : 'Project'}`, state.activeJobId);
     });
 
-    document.getElementById('btn-close-expense-modal').addEventListener('click', () => {
-        document.getElementById('modal-update-expense').classList.add('hidden');
-    });
-
-    document.getElementById('form-update-expense').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        if (!state.activeJobId) return;
-
-        const expenseVal = parseFloat(document.getElementById('update-job-expense-value').value) || 0;
-
-        try {
-            const { error } = await supabaseClient
-                .from('jobs')
-                .update({ expense: expenseVal })
-                .eq('id', state.activeJobId);
-            if (error) throw error;
-        } catch (err) {
-            console.error("Update expense error:", err);
-            alert("Error updating expense: " + err.message);
-        }
-
-        document.getElementById('modal-update-expense').classList.add('hidden');
-        await refreshAllData();
-    });
-
-    // Update Paid Inflow Modal triggers
-    document.getElementById('btn-update-paid-inflow').addEventListener('click', () => {
+    document.getElementById('btn-record-outflow').addEventListener('click', () => {
         if (!state.activeJobId) return;
         const job = state.jobs.find(j => j.id === state.activeJobId);
-        if (!job) return;
-
-        document.getElementById('update-job-inflow-value').value = job.amount_given || 0;
-        document.getElementById('modal-update-inflow').classList.remove('hidden');
+        openTransactionModal('Job Expense', `Expense paid for ${job ? job.title : 'Project'}`, state.activeJobId);
     });
 
-    document.getElementById('btn-close-inflow-modal').addEventListener('click', () => {
-        document.getElementById('modal-update-inflow').classList.add('hidden');
+    document.getElementById('btn-close-transaction-modal').addEventListener('click', () => {
+        document.getElementById('modal-add-transaction').classList.add('hidden');
     });
 
-    document.getElementById('form-update-inflow').addEventListener('submit', async (e) => {
+    // Unified Transaction Creation Handler
+    document.getElementById('form-add-transaction').addEventListener('submit', async (e) => {
         e.preventDefault();
-        if (!state.activeJobId) return;
+        const type = document.getElementById('transaction-type').value;
+        const jobId = document.getElementById('transaction-job-id').value || null;
+        const name = document.getElementById('transaction-name').value;
+        const amount = parseFloat(document.getElementById('transaction-amount').value) || 0;
+        
+        const methodOption = document.querySelector('input[name="payment_method"]:checked');
+        const method = methodOption ? methodOption.value : 'Cash';
+        
+        const customDateVal = document.getElementById('transaction-date').value;
+        const date = customDateVal ? new Date(customDateVal).toISOString() : new Date().toISOString();
 
-        const inflowVal = parseFloat(document.getElementById('update-job-inflow-value').value) || 0;
+        const newTx = {
+            id: getUUID(),
+            job_id: jobId,
+            type,
+            name,
+            amount,
+            payment_method: method,
+            date
+        };
 
         try {
             const { error } = await supabaseClient
-                .from('jobs')
-                .update({ amount_given: inflowVal })
-                .eq('id', state.activeJobId);
+                .from('transactions')
+                .insert([newTx]);
             if (error) throw error;
         } catch (err) {
-            console.error("Update inflow error:", err);
-            alert("Error updating inflow: " + err.message);
+            console.error("Add transaction error:", err);
+            alert("Error adding transaction: " + err.message);
         }
 
-        document.getElementById('modal-update-inflow').classList.add('hidden');
-        await refreshAllData();
-    });
-
-    // Dashboard click updates for Investment & Base Expense
-    document.getElementById('node-investment').addEventListener('click', () => {
-        const currentVal = state.cashflow['investment'] || 0;
-        document.getElementById('cf-node-key').value = 'investment';
-        document.getElementById('cf-modal-title').textContent = 'Update Investment';
-        document.getElementById('cf-node-value').value = currentVal;
-        document.getElementById('modal-update-cashflow').classList.remove('hidden');
-    });
-
-    document.getElementById('node-expense').addEventListener('click', () => {
-        const currentVal = state.cashflow['expense'] || 0;
-        document.getElementById('cf-node-key').value = 'expense';
-        document.getElementById('cf-modal-title').textContent = 'Update Base Expense';
-        document.getElementById('cf-node-value').value = currentVal;
-        document.getElementById('modal-update-cashflow').classList.remove('hidden');
-    });
-
-    document.getElementById('btn-close-cf-modal').addEventListener('click', () => {
-        document.getElementById('modal-update-cashflow').classList.add('hidden');
-    });
-
-    document.getElementById('form-update-cashflow').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const key = document.getElementById('cf-node-key').value;
-        const val = parseFloat(document.getElementById('cf-node-value').value) || 0;
-
-        try {
-            const { error } = await supabaseClient
-                .from('cashflow')
-                .upsert({ id: key, value: val, updated_at: new Date().toISOString() });
-            if (error) throw error;
-        } catch (err) {
-            console.error("Update cashflow node error:", err);
-            alert("Error updating cashflow: " + err.message);
-        }
-
-        document.getElementById('modal-update-cashflow').classList.add('hidden');
-        await refreshAllData();
-    });
-
-    // Create General/Utility Expense trigger
-    document.getElementById('btn-add-other-expense').addEventListener('click', () => {
-        document.getElementById('modal-other-expense').classList.remove('hidden');
-    });
-
-    document.getElementById('btn-close-other-expense-modal').addEventListener('click', () => {
-        document.getElementById('modal-other-expense').classList.add('hidden');
-    });
-
-    document.getElementById('form-create-other-expense').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const desc = document.getElementById('other-expense-desc').value;
-        const amt = parseFloat(document.getElementById('other-expense-amount').value) || 0;
-
-        try {
-            const { error } = await supabaseClient
-                .from('other_expenses')
-                .insert([{ description: desc, amount: amt }]);
-            if (error) throw error;
-        } catch (err) {
-            console.error("Add other expense error:", err);
-            alert("Error adding expense: " + err.message);
-        }
-
-        document.getElementById('modal-other-expense').classList.add('hidden');
-        document.getElementById('form-create-other-expense').reset();
+        document.getElementById('modal-add-transaction').classList.add('hidden');
+        document.getElementById('form-add-transaction').reset();
         await refreshAllData();
     });
 
@@ -1058,4 +1029,14 @@ function setupEventHandlers() {
             await refreshAllData();
         }
     });
+}
+
+function openTransactionModal(type, title, jobId) {
+    document.getElementById('transaction-type').value = type;
+    document.getElementById('transaction-job-id').value = jobId || '';
+    document.getElementById('transaction-modal-title').textContent = title;
+    document.getElementById('transaction-name').value = type === 'Investment' ? 'Investment Inflow' : '';
+    document.getElementById('transaction-amount').value = '';
+    document.getElementById('transaction-date').value = '';
+    document.getElementById('modal-add-transaction').classList.remove('hidden');
 }
