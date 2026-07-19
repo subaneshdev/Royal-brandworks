@@ -263,6 +263,9 @@ function renderClients() {
                     <button class="btn btn-primary" onclick="event.stopPropagation(); openCreateJobForClient('${client.id}')" style="min-height: 32px; padding: 0 10px; font-size: 12px; margin-right: 8px;">
                         <i data-lucide="plus" style="width: 14px; height: 14px;"></i> Create Job
                     </button>
+                    <button class="btn btn-danger" onclick="event.stopPropagation(); deleteClient('${client.id}')" style="min-height: 32px; padding: 0 10px; font-size: 12px; margin-right: 8px; background-color: var(--danger);">
+                        <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+                    </button>
                     <i data-lucide="${isExpanded ? 'chevron-up' : 'chevron-down'}" style="color: var(--text-secondary);"></i>
                 </div>
             </div>
@@ -326,6 +329,22 @@ window.navigateToJobTracking = function(jobId) {
 window.openCreateJobForClient = function(clientId) {
     document.getElementById('job-client-id').value = clientId;
     document.getElementById('modal-job').classList.remove('hidden');
+};
+
+window.deleteClient = async function(clientId) {
+    if (confirm("Are you sure you want to delete this client? All projects and brand assets under this client will be permanently removed.")) {
+        try {
+            const { error } = await supabaseClient
+                .from('clients')
+                .delete()
+                .eq('id', clientId);
+            if (error) throw error;
+            await refreshAllData();
+        } catch (e) {
+            console.error("Delete client error:", e);
+            alert("Error deleting client: " + e.message);
+        }
+    }
 };
 
 // View 3: Work Orders directory
