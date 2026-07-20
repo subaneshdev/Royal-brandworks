@@ -264,10 +264,19 @@ function renderDashboard() {
             minute: '2-digit'
         });
 
+        // Parse Name and Person Name
+        let displayName = t.name;
+        let personSnippet = '';
+        if (t.name.includes(' - By: ')) {
+            const parts = t.name.split(' - By: ');
+            displayName = parts[0];
+            personSnippet = `<span class="person-tag" style="display: block; font-size: 11px; color: var(--text-secondary); margin-top: 2px;"><i data-lucide="user" style="width: 10px; height: 10px; display: inline-block; vertical-align: middle; margin-right: 2px;"></i>${parts[1]}</span>`;
+        }
+
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>${dateStr}</td>
-            <td><strong>${t.name}</strong>${jobSuffix}</td>
+            <td><strong>${displayName}</strong>${jobSuffix}${personSnippet}</td>
             <td><span class="pill ${t.type.includes('Inflow') || t.type.includes('Investment') ? 'pill-success' : 'pill-danger'}">${t.type}</span></td>
             <td><span class="method-tag" style="font-size: 11px;"><i data-lucide="${iconName}" style="width: 12px; height: 12px; vertical-align: middle; margin-right: 2px;"></i>${t.payment_method}</span></td>
             <td><span class="${t.type.includes('Inflow') || t.type.includes('Investment') ? 'success-text' : 'danger-text'}" style="font-weight: 700;">${formatINR(t.amount)}</span></td>
@@ -613,12 +622,23 @@ function renderTracking() {
             jobTransactions.forEach(t => {
                 const iconName = getPaymentMethodIcon(t.payment_method);
                 const isPositive = t.type === 'Job Inflow';
+
+                // Parse Name and Person Name
+                let displayName = t.name;
+                let personSnippet = '';
+                if (t.name.includes(' - By: ')) {
+                    const parts = t.name.split(' - By: ');
+                    displayName = parts[0];
+                    personSnippet = `<span class="person-tag" style="display: block; font-size: 10px; color: var(--text-secondary); margin-top: 2px;"><i data-lucide="user" style="width: 8px; height: 8px; display: inline-block; vertical-align: middle; margin-right: 2px;"></i>${parts[1]}</span>`;
+                }
+
                 const row = document.createElement('div');
                 row.className = 'job-ledger-row';
                 row.innerHTML = `
                     <div class="left-desc">
-                        <strong>${t.name}</strong>
+                        <strong>${displayName}</strong>
                         <span class="method-tag"><i data-lucide="${iconName}" style="width: 10px; height: 10px;"></i>${t.payment_method}</span>
+                        ${personSnippet}
                     </div>
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <span class="val-amt ${isPositive ? 'success-text' : 'danger-text'}">${isPositive ? '+' : '-'}${formatINR(t.amount)}</span>
@@ -984,7 +1004,9 @@ function setupEventHandlers() {
         e.preventDefault();
         const type = document.getElementById('transaction-type').value;
         const jobId = document.getElementById('transaction-job-id').value || null;
-        const name = document.getElementById('transaction-name').value;
+        const desc = document.getElementById('transaction-name').value;
+        const person = document.getElementById('transaction-person').value || '';
+        const name = person ? `${desc} - By: ${person}` : desc;
         const amount = parseFloat(document.getElementById('transaction-amount').value) || 0;
         
         const methodOption = document.querySelector('input[name="payment_method"]:checked');
@@ -1094,6 +1116,7 @@ function openTransactionModal(type, title, jobId) {
     document.getElementById('transaction-job-id').value = jobId || '';
     document.getElementById('transaction-modal-title').textContent = title;
     document.getElementById('transaction-name').value = type === 'Investment' ? 'Investment Inflow' : '';
+    document.getElementById('transaction-person').value = '';
     document.getElementById('transaction-amount').value = '';
     document.getElementById('transaction-date').value = '';
     document.getElementById('modal-add-transaction').classList.remove('hidden');
