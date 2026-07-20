@@ -20,6 +20,20 @@ function getUUID() {
     });
 }
 
+// Toast Notification Utility
+function showToast(message, type = 'success') {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+    const toast = document.createElement('div');
+    toast.className = `toast-message toast-${type}`;
+    toast.textContent = message;
+    container.appendChild(toast);
+    setTimeout(() => {
+        toast.classList.add('fade-out');
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
 // Application State
 let state = {
     currentTab: 'dashboard',
@@ -383,6 +397,7 @@ window.deleteClient = async function(clientId) {
                 .delete()
                 .eq('id', clientId);
             if (error) throw error;
+            showToast('Client deleted successfully', 'danger');
             await refreshAllData();
         } catch (e) {
             console.error("Delete client error:", e);
@@ -527,11 +542,20 @@ function renderTracking() {
     });
 
     if (client) {
-        document.getElementById('overview-client-name').textContent = client.name;
+        const clientNameEl = document.getElementById('overview-client-name');
+        if (clientNameEl) clientNameEl.textContent = client.name;
         
-        const dateOpt = { day: '2-digit', month: 'short', year: 'numeric' };
-        document.getElementById('overview-start-date').textContent = client.start_date ? new Date(client.start_date).toLocaleDateString('en-IN', dateOpt) : 'Not set';
-        document.getElementById('overview-deadline').textContent = client.deadline ? new Date(client.deadline).toLocaleDateString('en-IN', dateOpt) : 'Not set';
+        const startDateEl = document.getElementById('overview-start-date');
+        if (startDateEl) {
+            const dateOpt = { day: '2-digit', month: 'short', year: 'numeric' };
+            startDateEl.textContent = client.start_date ? new Date(client.start_date).toLocaleDateString('en-IN', dateOpt) : 'Not set';
+        }
+        
+        const deadlineEl = document.getElementById('overview-deadline');
+        if (deadlineEl) {
+            const dateOpt = { day: '2-digit', month: 'short', year: 'numeric' };
+            deadlineEl.textContent = client.deadline ? new Date(client.deadline).toLocaleDateString('en-IN', dateOpt) : 'Not set';
+        }
         
         const clientJobs = state.jobs.filter(j => j.client_id === client.id);
         let clientStatus = 'Completed';
@@ -541,8 +565,10 @@ function renderTracking() {
             clientStatus = 'On Track';
         }
         const statusEl = document.getElementById('overview-status');
-        statusEl.textContent = clientStatus;
-        statusEl.className = `pill ${clientStatus === 'On Track' ? 'pill-success' : 'pill-neutral'}`;
+        if (statusEl) {
+            statusEl.textContent = clientStatus;
+            statusEl.className = `pill ${clientStatus === 'On Track' ? 'pill-success' : 'pill-neutral'}`;
+        }
 
         // Dynamic Calculations from Transactions belonging to this Job
         console.log("Active Job ID:", job.id, "All Transactions:", state.transactions);
@@ -664,6 +690,7 @@ window.toggleStep = async function(stepIndex) {
             .eq('id', job.id);
         
         if (error) throw error;
+        showToast('Milestone status updated', 'success');
     } catch (e) {
         console.error("Update step failed", e);
     }
@@ -695,6 +722,7 @@ window.deleteStep = async function(stepIndex) {
             .eq('id', job.id);
             
         if (error) throw error;
+        showToast('Milestone step deleted', 'danger');
     } catch (e) {
         console.error("Delete step failed", e);
     }
@@ -867,6 +895,7 @@ function setupEventHandlers() {
                 .from('jobs')
                 .insert([newJob]);
             if (error) throw error;
+            showToast('Job created successfully', 'success');
         } catch (err) {
             console.error("Create job error:", err);
             alert("Error creating job: " + err.message);
@@ -915,6 +944,7 @@ function setupEventHandlers() {
                 .update({ milestone_steps: steps })
                 .eq('id', job.id);
             if (error) throw error;
+            showToast('Milestone step added', 'success');
         } catch (err) {
             console.error("Add step error:", err);
         }
@@ -978,6 +1008,7 @@ function setupEventHandlers() {
                 .from('transactions')
                 .insert([newTx]);
             if (error) throw error;
+            showToast('Transaction recorded successfully', 'success');
         } catch (err) {
             console.error("Add transaction error:", err);
             alert("Error adding transaction: " + err.message);
@@ -1026,6 +1057,7 @@ function setupEventHandlers() {
                     .from('client_photos')
                     .insert([newPhotoObj]);
                 if (error) throw error;
+                showToast('Brand photo uploaded successfully', 'success');
             } catch (err) {
                 console.error("Gallery upload error:", err);
                 alert("Upload failed: " + err.message);
@@ -1046,6 +1078,7 @@ function setupEventHandlers() {
                     .delete()
                     .eq('id', state.activeJobId);
                 if (error) throw error;
+                showToast('Job/Project deleted successfully', 'danger');
                 state.activeJobId = null;
                 await refreshAllData();
             } catch (e) {
@@ -1074,6 +1107,7 @@ window.deleteTransaction = async function(txId) {
                 .delete()
                 .eq('id', txId);
             if (error) throw error;
+            showToast('Transaction record deleted', 'danger');
             await refreshAllData();
         } catch (e) {
             console.error("Delete transaction error:", e);

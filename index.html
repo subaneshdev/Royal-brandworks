@@ -274,8 +274,30 @@
                                 <!-- Populated dynamically -->
                             </div>
                         </div>
-
                         <div class="stepper-sidebars-column">
+                            <!-- Project Overview Sidebar -->
+                            <div class="overview-sidebar-card">
+                                <h4>Project Overview</h4>
+                                <div class="sidebar-details-grid">
+                                    <div class="detail-row">
+                                        <span class="label">Client</span>
+                                        <span class="value" id="overview-client-name">Acme Corp</span>
+                                    </div>
+                                    <div class="detail-row">
+                                        <span class="label">Start Date</span>
+                                        <span class="value" id="overview-start-date">Not set</span>
+                                    </div>
+                                    <div class="detail-row">
+                                        <span class="label">Deadline</span>
+                                        <span class="value" id="overview-deadline">Not set</span>
+                                    </div>
+                                    <div class="detail-row">
+                                        <span class="label">Status</span>
+                                        <span class="pill pill-success" id="overview-status">On Track</span>
+                                    </div>
+                                </div>
+                            </div>
+
                             <!-- Project Quotation Overview -->
                             <div class="overview-sidebar-card">
                                 <h4>Project Budget (Quotation)</h4>
@@ -577,6 +599,8 @@
             </form>
         </div>
     </div>
+
+    <div class="toast-container" id="toast-container"></div>
 
     <script src="app.js"></script>
 </body>
