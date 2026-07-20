@@ -234,7 +234,7 @@ function renderDashboard() {
     tbody.innerHTML = '';
 
     if (state.transactions.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: var(--text-secondary);">No transactions recorded yet.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--text-secondary);">No transactions recorded yet.</td></tr>';
         return;
     }
 
@@ -257,6 +257,11 @@ function renderDashboard() {
             <td><span class="pill ${t.type.includes('Inflow') || t.type.includes('Investment') ? 'pill-success' : 'pill-danger'}">${t.type}</span></td>
             <td><span class="method-tag" style="font-size: 11px;"><i data-lucide="${iconName}" style="width: 12px; height: 12px; vertical-align: middle; margin-right: 2px;"></i>${t.payment_method}</span></td>
             <td><span class="${t.type.includes('Inflow') || t.type.includes('Investment') ? 'success-text' : 'danger-text'}" style="font-weight: 700;">${formatINR(t.amount)}</span></td>
+            <td>
+                <button class="btn btn-danger" onclick="event.stopPropagation(); deleteTransaction('${t.id}')" style="min-height: 28px; padding: 2px 8px; font-size: 11px; background-color: var(--danger);">
+                    <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i>
+                </button>
+            </td>
         `;
         tbody.appendChild(tr);
     });
@@ -505,12 +510,6 @@ function renderTracking() {
                     </div>
                     <span class="step-desc" onclick="toggleStep(${idx})">${step.description || ''}</span>
                     ${step.completed && timestampStr ? `<span class="step-time">Completed at ${timestampStr}</span>` : ''}
-                    
-                    <!-- Inline Step Expense Input -->
-                    <div class="step-expense-box">
-                        <span>Cost: ₹</span>
-                        <input type="number" class="step-cost-input" value="${step.expense || 0}" onchange="updateStepExpense(${idx}, this.value)" onclick="event.stopPropagation()">
-                    </div>
                 </div>
                 ${!isPayment ? `<button class="btn-delete-step" onclick="event.stopPropagation(); deleteStep(${idx})"><i data-lucide="trash-2" style="width: 16px; height: 16px;"></i></button>` : ''}
             </div>
@@ -546,7 +545,9 @@ function renderTracking() {
         statusEl.className = `pill ${clientStatus === 'On Track' ? 'pill-success' : 'pill-neutral'}`;
 
         // Dynamic Calculations from Transactions belonging to this Job
+        console.log("Active Job ID:", job.id, "All Transactions:", state.transactions);
         const jobTransactions = state.transactions.filter(t => t.job_id === job.id);
+        console.log("Filtered Job Transactions:", jobTransactions);
         const inflowVal = jobTransactions.filter(t => t.type === 'Job Inflow').reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
         const actualExpenseVal = jobTransactions.filter(t => t.type === 'Job Expense').reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
 
@@ -593,7 +594,12 @@ function renderTracking() {
                         <strong>${t.name}</strong>
                         <span class="method-tag"><i data-lucide="${iconName}" style="width: 10px; height: 10px;"></i>${t.payment_method}</span>
                     </div>
-                    <span class="val-amt ${isPositive ? 'success-text' : 'danger-text'}">${isPositive ? '+' : '-'}${formatINR(t.amount)}</span>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span class="val-amt ${isPositive ? 'success-text' : 'danger-text'}">${isPositive ? '+' : '-'}${formatINR(t.amount)}</span>
+                        <button class="btn btn-danger" onclick="event.stopPropagation(); deleteTransaction('${t.id}')" style="min-height: 24px; padding: 2px 6px; font-size: 10px; background-color: var(--danger); width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px;">
+                            <i data-lucide="trash-2" style="width: 10px; height: 10px;"></i>
+                        </button>
+                    </div>
                 `;
                 jobLedger.appendChild(row);
             });
@@ -1029,6 +1035,25 @@ function setupEventHandlers() {
             await refreshAllData();
         }
     });
+
+    // Delete Active Job click listener
+    document.getElementById('btn-delete-active-job').addEventListener('click', async () => {
+        if (!state.activeJobId) return;
+        if (confirm("Are you sure you want to delete this project/job? All progress and transactions will be lost.")) {
+            try {
+                const { error } = await supabaseClient
+                    .from('jobs')
+                    .delete()
+                    .eq('id', state.activeJobId);
+                if (error) throw error;
+                state.activeJobId = null;
+                await refreshAllData();
+            } catch (e) {
+                console.error("Delete job error:", e);
+                alert("Error deleting job: " + e.message);
+            }
+        }
+    });
 }
 
 function openTransactionModal(type, title, jobId) {
@@ -1040,3 +1065,19 @@ function openTransactionModal(type, title, jobId) {
     document.getElementById('transaction-date').value = '';
     document.getElementById('modal-add-transaction').classList.remove('hidden');
 }
+
+window.deleteTransaction = async function(txId) {
+    if (confirm("Are you sure you want to delete this transaction record?")) {
+        try {
+            const { error } = await supabaseClient
+                .from('transactions')
+                .delete()
+                .eq('id', txId);
+            if (error) throw error;
+            await refreshAllData();
+        } catch (e) {
+            console.error("Delete transaction error:", e);
+            alert("Error deleting transaction: " + e.message);
+        }
+    }
+};

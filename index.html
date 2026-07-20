@@ -153,6 +153,7 @@
                                 <th>Type</th>
                                 <th>Method</th>
                                 <th>Amount</th>
+                                <th>Action</th>
                             </tr>
                         </thead>
                         <tbody id="global-ledger-tbody">
@@ -253,9 +254,14 @@
                     
                     <div class="stepper-main-container hidden" id="stepper-active-content">
                         <div class="stepper-milestones-column">
-                            <div class="stepper-title-row">
-                                <h3 id="stepper-job-title">Rebranding Phase 1</h3>
-                                <p id="stepper-job-subtitle">Track progress and mark milestones for Acme Corp.</p>
+                            <div class="stepper-title-row" style="display: flex; justify-content: space-between; align-items: flex-start;">
+                                <div>
+                                    <h3 id="stepper-job-title">Rebranding Phase 1</h3>
+                                    <p id="stepper-job-subtitle">Track progress and mark milestones for Acme Corp.</p>
+                                </div>
+                                <button class="btn btn-danger" id="btn-delete-active-job" style="min-height: 32px; padding: 0 10px; font-size: 12px; background-color: var(--danger);">
+                                    <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i> Delete Job
+                                </button>
                             </div>
                             
                             <div class="stepper-container" id="milestone-stepper">
