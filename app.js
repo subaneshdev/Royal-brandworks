@@ -165,6 +165,42 @@ function fileToBase64(file) {
     });
 }
 
+// Helper to compress and convert images to lightweight Base64 data URLs
+function compressImage(file, maxWidth = 800, quality = 0.75) {
+    return new Promise((resolve, reject) => {
+        if (!file || !file.type || !file.type.startsWith('image/')) {
+            return fileToBase64(file).then(resolve).catch(reject);
+        }
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+            const img = new Image();
+            img.src = event.target.result;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+
+                if (width > maxWidth) {
+                    height = Math.round((height * maxWidth) / width);
+                    width = maxWidth;
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                const dataUrl = canvas.toDataURL('image/jpeg', quality);
+                resolve(dataUrl);
+            };
+            img.onerror = error => reject(error);
+        };
+        reader.onerror = error => reject(error);
+    });
+}
+
 // Helper for Lucide icons mapping for Payment Methods
 function getPaymentMethodIcon(method) {
     switch (method) {
@@ -853,10 +889,10 @@ function setupEventHandlers() {
         let logoBase64 = null;
 
         if (logoFile) {
-            logoBase64 = await fileToBase64(logoFile);
+            logoBase64 = await compressImage(logoFile, 400, 0.8);
         }
 
-        const newClient = {
+        const clientDataNoStatus = {
             id: getUUID(),
             name,
             type,
@@ -864,11 +900,29 @@ function setupEventHandlers() {
             created_at: new Date().toISOString()
         };
 
+        const clientDataWithStatus = {
+            id: getUUID(),
+            name,
+            type,
+            status: 'Active',
+            logo: logoBase64,
+            created_at: new Date().toISOString()
+        };
+
         try {
-            const { error } = await supabaseClient
+            let { error } = await supabaseClient
                 .from('clients')
-                .insert([newClient]);
+                .insert([clientDataNoStatus]);
+            
+            if (error && error.message && error.message.includes('status')) {
+                const retryRes = await supabaseClient
+                    .from('clients')
+                    .insert([clientDataWithStatus]);
+                error = retryRes.error;
+            }
+
             if (error) throw error;
+            showToast('Client created successfully', 'success');
         } catch (err) {
             console.error("Create client error:", err);
             alert("Error creating client: " + err.message);
@@ -1093,7 +1147,7 @@ function setupEventHandlers() {
         }
 
         if (file) {
-            const base64Photo = await fileToBase64(file);
+            const base64Photo = await compressImage(file, 800, 0.75);
             
             const newPhotoObj = {
                 id: getUUID(),
