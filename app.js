@@ -281,9 +281,14 @@ function renderDashboard() {
             <td><span class="method-tag" style="font-size: 11px;"><i data-lucide="${iconName}" style="width: 12px; height: 12px; vertical-align: middle; margin-right: 2px;"></i>${t.payment_method}</span></td>
             <td><span class="${t.type.includes('Inflow') || t.type.includes('Investment') ? 'success-text' : 'danger-text'}" style="font-weight: 700;">${formatINR(t.amount)}</span></td>
             <td>
-                <button class="btn btn-danger" onclick="event.stopPropagation(); deleteTransaction('${t.id}')" style="min-height: 28px; padding: 2px 8px; font-size: 11px; background-color: var(--danger);">
-                    <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i>
-                </button>
+                <div style="display: flex; gap: 4px;">
+                    <button class="btn btn-primary" onclick="event.stopPropagation(); editTransaction('${t.id}')" style="min-height: 28px; padding: 2px 8px; font-size: 11px;">
+                        <i data-lucide="pencil" style="width: 12px; height: 12px;"></i>
+                    </button>
+                    <button class="btn btn-danger" onclick="event.stopPropagation(); deleteTransaction('${t.id}')" style="min-height: 28px; padding: 2px 8px; font-size: 11px; background-color: var(--danger);">
+                        <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i>
+                    </button>
+                </div>
             </td>
         `;
         tbody.appendChild(tr);
@@ -600,10 +605,10 @@ function renderTracking() {
         document.getElementById('inflow-progress-bar').style.width = `${inflowPercent}%`;
         document.getElementById('inflow-percent').textContent = `${inflowPercent}% collected`;
 
-        // 2. OUTFLOW (OUT) - Expenses incurred vs Total Inflow
-        const expensePercent = Math.min(Math.round((actualExpenseVal / (quotation || 1)) * 100), 100);
+        // 2. OUTFLOW (OUT) - Expenses incurred vs Estimated Expense limit
+        const expensePercent = Math.min(Math.round((actualExpenseVal / (estExpense || 1)) * 100), 100);
         document.getElementById('expense-value').textContent = formatINR(actualExpenseVal);
-        document.getElementById('expense-limit-value').textContent = `/ ${formatINR(quotation)}`;
+        document.getElementById('expense-limit-value').textContent = `/ ${formatINR(estExpense)}`;
         document.getElementById('expense-progress-bar').style.width = `${expensePercent}%`;
         document.getElementById('expense-percent').textContent = `${expensePercent}% utilized`;
 
@@ -640,9 +645,12 @@ function renderTracking() {
                         <span class="method-tag"><i data-lucide="${iconName}" style="width: 10px; height: 10px;"></i>${t.payment_method}</span>
                         ${personSnippet}
                     </div>
-                    <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="display: flex; align-items: center; gap: 4px;">
                         <span class="val-amt ${isPositive ? 'success-text' : 'danger-text'}">${isPositive ? '+' : '-'}${formatINR(t.amount)}</span>
-                        <button class="btn btn-danger" onclick="event.stopPropagation(); deleteTransaction('${t.id}')" style="min-height: 24px; padding: 2px 6px; font-size: 10px; background-color: var(--danger); width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px;">
+                        <button class="btn btn-primary" onclick="event.stopPropagation(); editTransaction('${t.id}')" style="min-height: 24px; padding: 2px 4px; font-size: 10px; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px;">
+                            <i data-lucide="pencil" style="width: 10px; height: 10px;"></i>
+                        </button>
+                        <button class="btn btn-danger" onclick="event.stopPropagation(); deleteTransaction('${t.id}')" style="min-height: 24px; padding: 2px 4px; font-size: 10px; background-color: var(--danger); width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border-radius: 4px;">
                             <i data-lucide="trash-2" style="width: 10px; height: 10px;"></i>
                         </button>
                     </div>
@@ -1025,19 +1033,40 @@ function setupEventHandlers() {
             date
         };
 
+        const form = document.getElementById('form-add-transaction');
+        const editingId = form.dataset.editingId;
+
         try {
-            const { error } = await supabaseClient
-                .from('transactions')
-                .insert([newTx]);
-            if (error) throw error;
-            showToast('Transaction recorded successfully', 'success');
+            if (editingId) {
+                const { error } = await supabaseClient
+                    .from('transactions')
+                    .update({
+                        job_id: jobId,
+                        type,
+                        name,
+                        amount,
+                        payment_method: method,
+                        date
+                    })
+                    .eq('id', editingId);
+                if (error) throw error;
+                delete form.dataset.editingId;
+                showToast('Transaction updated successfully', 'success');
+            } else {
+                const { error } = await supabaseClient
+                    .from('transactions')
+                    .insert([newTx]);
+                if (error) throw error;
+                showToast('Transaction recorded successfully', 'success');
+            }
         } catch (err) {
-            console.error("Add transaction error:", err);
-            alert("Error adding transaction: " + err.message);
+            console.error("Save transaction error:", err);
+            alert("Error saving transaction: " + err.message);
         }
 
         document.getElementById('modal-add-transaction').classList.add('hidden');
-        document.getElementById('form-add-transaction').reset();
+        form.reset();
+        delete form.dataset.editingId;
         await refreshAllData();
     });
 
@@ -1112,6 +1141,8 @@ function setupEventHandlers() {
 }
 
 function openTransactionModal(type, title, jobId) {
+    const form = document.getElementById('form-add-transaction');
+    delete form.dataset.editingId;
     document.getElementById('transaction-type').value = type;
     document.getElementById('transaction-job-id').value = jobId || '';
     document.getElementById('transaction-modal-title').textContent = title;
@@ -1137,4 +1168,35 @@ window.deleteTransaction = async function(txId) {
             alert("Error deleting transaction: " + e.message);
         }
     }
+};
+
+window.editTransaction = function(txId) {
+    const tx = state.transactions.find(t => t.id === txId);
+    if (!tx) return;
+
+    document.getElementById('transaction-type').value = tx.type;
+    document.getElementById('transaction-job-id').value = tx.job_id || '';
+    document.getElementById('transaction-modal-title').textContent = `Edit Transaction: ${tx.type}`;
+
+    let displayName = tx.name;
+    let personName = '';
+    if (tx.name.includes(' - By: ')) {
+        const parts = tx.name.split(' - By: ');
+        displayName = parts[0];
+        personName = parts[1];
+    }
+
+    document.getElementById('transaction-name').value = displayName;
+    document.getElementById('transaction-person').value = personName;
+    document.getElementById('transaction-amount').value = tx.amount;
+
+    const radios = document.getElementsByName('payment_method');
+    radios.forEach(r => {
+        if (r.value === tx.payment_method) r.checked = true;
+    });
+
+    const form = document.getElementById('form-add-transaction');
+    form.dataset.editingId = txId;
+
+    document.getElementById('modal-add-transaction').classList.remove('hidden');
 };
