@@ -110,24 +110,26 @@ function recalculateFinancials() {
         .filter(t => t.type === 'Job Inflow')
         .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
 
-    // 2. Expense: sum of all Job Expense + Other Expense transactions
-    const totalExpense = state.transactions
-        .filter(t => t.type === 'Job Expense' || t.type === 'Other Expense')
+    // 2. Working Capital (Job Expense): sum of all Job Expense transactions
+    const workingCapital = state.transactions
+        .filter(t => t.type === 'Job Expense')
         .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
 
-    // 3. Net Profit = Revenue - Expense
-    const netProfit = totalRevenue - totalExpense;
+    // 3. Expense (Utility Expense): sum of all Other Expense transactions
+    const totalExpense = state.transactions
+        .filter(t => t.type === 'Other Expense')
+        .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
 
-    // 4. Investment: sum of all Investment transactions
+    // 4. Net Profit = Revenue - Working Capital - Expense
+    const netProfit = totalRevenue - workingCapital - totalExpense;
+
+    // 5. Investment: sum of all Investment transactions
     const investment = state.transactions
         .filter(t => t.type === 'Investment')
         .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
 
-    // 5. Working Capital = Investment + Net Profit
-    const workingCapital = investment + netProfit;
-
-    // 6. Running Capital = 60% of Working Capital
-    const runningCapital = workingCapital * 0.6;
+    // 6. Running Capital = Investment + Net Profit
+    const runningCapital = investment + netProfit;
 
     // Save calculations into state
     state.overallFinancials = {
@@ -798,15 +800,32 @@ function renderGallery() {
     const photoGrid = document.getElementById('gallery-photo-grid');
     photoGrid.innerHTML = '';
 
-    const selectedClientId = document.getElementById('gallery-client-select').value;
-    
+    const selectedJobId = document.getElementById('gallery-job-select').value;
+    const uploadContainer = document.getElementById('gallery-upload-container');
+    const downloadBtn = document.getElementById('btn-download-job-photos');
+
+    if (selectedJobId === 'all') {
+        uploadContainer.style.display = 'none';
+        downloadBtn.style.display = 'none';
+    } else {
+        uploadContainer.style.display = 'block';
+        downloadBtn.style.display = 'flex';
+    }
+
     let filteredPhotos = state.clientPhotos;
-    if (selectedClientId && selectedClientId !== '') {
-        filteredPhotos = filteredPhotos.filter(p => p.client_id === selectedClientId);
+    if (selectedJobId && selectedJobId !== 'all') {
+        filteredPhotos = filteredPhotos.filter(p => {
+            try {
+                const parsed = JSON.parse(p.caption);
+                return parsed.jobId === selectedJobId;
+            } catch (e) {
+                return false;
+            }
+        });
     }
 
     if (filteredPhotos.length === 0) {
-        photoGrid.innerHTML = '<div class="empty-state" style="grid-column: 1 / -1;"><p>No brand assets uploaded for this client yet.</p></div>';
+        photoGrid.innerHTML = '<div class="empty-state" style="grid-column: 1 / -1;"><p>No brand assets uploaded for this project yet.</p></div>';
         return;
     }
 
@@ -816,29 +835,42 @@ function renderGallery() {
             month: 'short'
         });
 
+        let displayName = photo.caption;
+        try {
+            const parsed = JSON.parse(photo.caption);
+            displayName = parsed.text || '';
+        } catch (e) {}
+
         const card = document.createElement('div');
         card.className = 'photo-card';
         card.innerHTML = `
             <img src="${photo.url}" alt="Gallery Asset">
-            <div class="caption">${photo.caption || 'Brand Asset'}</div>
-            <div class="date">Uploaded ${dateStr}</div>
+            <div class="caption">${displayName || 'Brand Asset'}</div>
+            <div class="date" style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
+                <span>Uploaded ${dateStr}</span>
+                <button class="btn btn-danger" onclick="event.stopPropagation(); deleteGalleryPhoto('${photo.id}')" style="min-height: 20px; padding: 2px 4px; font-size: 9px; background-color: var(--danger); border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px;">
+                    <i data-lucide="trash-2" style="width: 10px; height: 10px;"></i>
+                </button>
+            </div>
         `;
         photoGrid.appendChild(card);
     });
+    lucide.createIcons();
 }
 
 function populateFormDropdowns() {
-    const gallerySelect = document.getElementById('gallery-client-select');
-    const selectedGal = gallerySelect.value;
-    gallerySelect.innerHTML = '<option value="">-- View All Gallery Photos --</option>';
+    const gallerySelect = document.getElementById('gallery-job-select');
+    const selectedJobId = gallerySelect.value;
+    gallerySelect.innerHTML = '<option value="all">All Projects / Jobs</option>';
 
-    state.clients.forEach(c => {
+    state.jobs.forEach(job => {
+        const client = state.clients.find(c => c.id === job.client_id);
         const option = document.createElement('option');
-        option.value = c.id;
-        option.textContent = c.name;
+        option.value = job.id;
+        option.textContent = `${client ? client.name : 'Unknown Client'} - ${job.title}`;
         gallerySelect.appendChild(option);
     });
-    if (selectedGal) gallerySelect.value = selectedGal;
+    if (selectedJobId) gallerySelect.value = selectedJobId;
 
     const jobClientSelect = document.getElementById('job-client-id');
     jobClientSelect.innerHTML = '<option value="">-- Choose Client --</option>';
@@ -1130,30 +1162,39 @@ function setupEventHandlers() {
         renderWorkOrders();
     });
 
-    document.getElementById('gallery-client-select').addEventListener('change', () => {
+    document.getElementById('gallery-job-select').addEventListener('change', () => {
         renderGallery();
     });
 
     // Photo Upload
     document.getElementById('form-upload-gallery').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const clientId = document.getElementById('gallery-client-select').value;
-        const caption = document.getElementById('gallery-caption').value;
+        const jobId = document.getElementById('gallery-job-select').value;
+        const captionText = document.getElementById('gallery-caption').value;
         const file = document.getElementById('gallery-file').files[0];
 
-        if (!clientId || clientId === '') {
-            alert('Please select a specific Client to upload the photo under.');
+        if (!jobId || jobId === 'all') {
+            alert('Please select a specific Job to upload the photo under.');
+            return;
+        }
+
+        const job = state.jobs.find(j => j.id === jobId);
+        if (!job) {
+            alert('Selected job was not found.');
             return;
         }
 
         if (file) {
             const base64Photo = await compressImage(file, 800, 0.75);
             
+            // Encode jobId inside the caption field to bypass database schema limits
+            const captionJsonString = JSON.stringify({ jobId: jobId, text: captionText });
+
             const newPhotoObj = {
                 id: getUUID(),
-                client_id: clientId,
+                client_id: job.client_id, // Satisfy foreign key constraint
                 url: base64Photo,
-                caption: caption,
+                caption: captionJsonString,
                 created_at: new Date().toISOString()
             };
 
@@ -1171,6 +1212,212 @@ function setupEventHandlers() {
             document.getElementById('form-upload-gallery').reset();
             await refreshAllData();
         }
+    });
+
+    // Download Job Photos (Printable Work Report) Listener
+    document.getElementById('btn-download-job-photos').addEventListener('click', () => {
+        const jobId = document.getElementById('gallery-job-select').value;
+        if (!jobId || jobId === 'all') return;
+
+        const job = state.jobs.find(j => j.id === jobId);
+        if (!job) return;
+
+        const client = state.clients.find(c => c.id === job.client_id);
+        const photos = state.clientPhotos.filter(p => {
+            try {
+                const parsed = JSON.parse(p.caption);
+                return parsed.jobId === jobId;
+            } catch (e) {
+                return false;
+            }
+        });
+
+        // Generate dynamic printable window HTML
+        const printWindow = window.open('', '_blank');
+        
+        let photosHtml = '';
+        photos.forEach(p => {
+            let captionText = p.caption;
+            try {
+                captionText = JSON.parse(p.caption).text;
+            } catch(e) {}
+            photosHtml += `
+                <div class="photo-item">
+                    <img src="${p.url}" />
+                    <p class="photo-caption">${captionText || 'Work Progress Photo'}</p>
+                </div>
+            `;
+        });
+
+        const jobTransactions = state.transactions.filter(t => t.job_id === jobId);
+        const inflowVal = jobTransactions.filter(t => t.type === 'Job Inflow').reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
+        const expenseVal = jobTransactions.filter(t => t.type === 'Job Expense').reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
+
+        printWindow.document.write(`
+            <html>
+            <head>
+                <title>Work Report - ${job.title}</title>
+                <style>
+                    body {
+                        font-family: system-ui, -apple-system, sans-serif;
+                        color: #111827;
+                        margin: 40px;
+                        padding: 0;
+                        background-color: #FFFFFF;
+                    }
+                    .header-bar {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        border-bottom: 2px solid #E5E7EB;
+                        padding-bottom: 20px;
+                        margin-bottom: 30px;
+                    }
+                    .brand-name {
+                        font-size: 20px;
+                        font-weight: 800;
+                        color: #FF6B00;
+                        letter-spacing: 0.05em;
+                    }
+                    .logo-img {
+                        height: 48px;
+                        object-fit: contain;
+                        border-radius: 4px;
+                    }
+                    .title-section h1 {
+                        font-size: 24px;
+                        font-weight: 700;
+                        margin: 0 0 8px 0;
+                        color: #1F2937;
+                    }
+                    .title-section p {
+                        font-size: 14px;
+                        color: #4B5563;
+                        margin: 0;
+                    }
+                    .details-grid {
+                        display: grid;
+                        grid-template-columns: 1fr 1fr;
+                        gap: 20px;
+                        margin-bottom: 40px;
+                        background: #F9FAFB;
+                        border: 1px solid #E5E7EB;
+                        border-radius: 8px;
+                        padding: 20px;
+                    }
+                    .detail-item {
+                        font-size: 14px;
+                        color: #1F2937;
+                    }
+                    .detail-item strong {
+                        display: block;
+                        font-size: 11px;
+                        color: #6B7280;
+                        text-transform: uppercase;
+                        margin-bottom: 4px;
+                        letter-spacing: 0.05em;
+                    }
+                    .photos-section {
+                        display: grid;
+                        grid-template-columns: 1fr 1fr;
+                        gap: 24px;
+                    }
+                    .photo-item {
+                        border: 1px solid #E5E7EB;
+                        border-radius: 8px;
+                        overflow: hidden;
+                        background: #FFFFFF;
+                        page-break-inside: avoid;
+                    }
+                    .photo-item img {
+                        width: 100%;
+                        height: 260px;
+                        object-fit: cover;
+                        display: block;
+                    }
+                    .photo-caption {
+                        padding: 12px;
+                        font-size: 13px;
+                        font-weight: 600;
+                        margin: 0;
+                        background: #F9FAFB;
+                        border-top: 1px solid #E5E7EB;
+                        color: #374151;
+                    }
+                    .print-btn-container {
+                        margin-bottom: 30px;
+                        text-align: right;
+                    }
+                    .btn-print {
+                        background-color: #FF6B00;
+                        color: white;
+                        border: none;
+                        padding: 10px 20px;
+                        font-size: 14px;
+                        font-weight: 700;
+                        border-radius: 6px;
+                        cursor: pointer;
+                        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                    }
+                    @media print {
+                        .print-btn-container {
+                            display: none;
+                        }
+                        body {
+                            margin: 20px;
+                        }
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="print-btn-container">
+                    <button class="btn-print" onclick="window.print()">Print / Save as PDF</button>
+                </div>
+                <div class="header-bar">
+                    <div>
+                        <span class="brand-name">ROYAL BRANDWORKS</span>
+                    </div>
+                    <img class="logo-img" src="${window.location.origin}/logo.jpg" onerror="this.style.display='none'" />
+                </div>
+                <div class="title-section">
+                    <h1>Work Completion &amp; Progress Report</h1>
+                    <p>Generated on ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+                </div>
+                <div style="margin-top: 20px;"></div>
+                <div class="details-grid">
+                    <div class="detail-item">
+                        <strong>Client Name</strong>
+                        ${client ? client.name : 'Unknown Client'}
+                    </div>
+                    <div class="detail-item">
+                        <strong>Project / Job Title</strong>
+                        ${job.title}
+                    </div>
+                    <div class="detail-item">
+                        <strong>Quotation Value</strong>
+                        ${formatINR(job.budget)}
+                    </div>
+                    <div class="detail-item">
+                        <strong>Current Status</strong>
+                        ${job.status}
+                    </div>
+                    <div class="detail-item">
+                        <strong>Client Payments (IN)</strong>
+                        ${formatINR(inflowVal)}
+                    </div>
+                    <div class="detail-item">
+                        <strong>Job Expenses (OUT)</strong>
+                        ${formatINR(expenseVal)}
+                    </div>
+                </div>
+                <h2 style="font-size: 18px; border-bottom: 1px solid #E5E7EB; padding-bottom: 8px; margin-bottom: 20px; color: #1F2937;">Project Gallery &amp; Proof of Work</h2>
+                <div class="photos-section">
+                    ${photosHtml || '<p style="grid-column: 1/-1; color: #6B7280; font-size: 14px;">No photos uploaded for this job yet.</p>'}
+                </div>
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
     });
 
     // Delete Active Job click listener
@@ -1253,4 +1500,21 @@ window.editTransaction = function(txId) {
     form.dataset.editingId = txId;
 
     document.getElementById('modal-add-transaction').classList.remove('hidden');
+};
+
+window.deleteGalleryPhoto = async function(photoId) {
+    if (confirm("Are you sure you want to delete this brand photo?")) {
+        try {
+            const { error } = await supabaseClient
+                .from('client_photos')
+                .delete()
+                .eq('id', photoId);
+            if (error) throw error;
+            showToast('Photo deleted successfully', 'danger');
+            await refreshAllData();
+        } catch (e) {
+            console.error("Delete photo error:", e);
+            alert("Error deleting photo: " + e.message);
+        }
+    }
 };

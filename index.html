@@ -97,7 +97,7 @@
                         <i data-lucide="piggy-bank" class="icon-wc"></i>
                     </div>
                     <span class="value" id="dash-working-capital">₹ 0</span>
-                    <span class="meta">Investment + Net Profit</span>
+                    <span class="meta">Total Job Expenses</span>
                 </div>
 
                 <!-- Running Capital Node -->
@@ -107,7 +107,7 @@
                         <i data-lucide="refresh-cw" class="icon-rc"></i>
                     </div>
                     <span class="value" id="dash-running-capital">₹ 0</span>
-                    <span class="meta">60% of Working Capital</span>
+                    <span class="meta">Investment + Net Profit</span>
                 </div>
 
                 <!-- Revenue Node -->
@@ -127,7 +127,7 @@
                         <i data-lucide="receipt" class="icon-exp"></i>
                     </div>
                     <span class="value danger-text" id="dash-expense">₹ 0</span>
-                    <span class="meta">Job costs + Utility expenses</span>
+                    <span class="meta">Utility / General Expenses</span>
                 </div>
 
                 <!-- Net Profit Node -->
@@ -137,7 +137,7 @@
                         <i data-lucide="award" class="icon-prof"></i>
                     </div>
                     <span class="value success-text" id="dash-profit">₹ 0</span>
-                    <span class="meta">Revenue minus Expenses</span>
+                    <span class="meta">Revenue - Job Exp - Utility</span>
                 </div>
             </div>
 
@@ -384,17 +384,21 @@
         <section class="content-view" id="view-gallery">
             <div class="view-header">
                 <h2>Brand Gallery</h2>
-                <span class="sub-label">Upload and view photos under each client</span>
+                <span class="sub-label">View and download photos grouped job-wise</span>
             </div>
 
             <div class="gallery-layout">
                 <div class="gallery-sidebar">
-                    <label for="gallery-client-select" class="form-label">Select Client</label>
-                    <select id="gallery-client-select" class="form-select">
-                        <!-- Loaded dynamically -->
+                    <label for="gallery-job-select" class="form-label">Select Project / Job</label>
+                    <select id="gallery-job-select" class="form-select">
+                        <option value="all">All Projects / Jobs</option>
                     </select>
 
-                    <div class="upload-box-container margin-top">
+                    <button class="btn btn-primary full-width margin-top" id="btn-download-job-photos" style="display: none; background-color: var(--success); border-color: var(--success); gap: 6px;">
+                        <i data-lucide="download"></i> Download Work Report
+                    </button>
+
+                    <div class="upload-box-container margin-top" id="gallery-upload-container" style="display: none;">
                         <h4>Upload Photo</h4>
                         <form id="form-upload-gallery">
                             <div class="form-group">
@@ -405,7 +409,7 @@
                                 <label for="gallery-caption">Caption</label>
                                 <input type="text" id="gallery-caption" class="form-input" placeholder="e.g. Completed storefront branding" required>
                             </div>
-                            <button type="submit" class="btn btn-primary full-width">Upload to Client</button>
+                            <button type="submit" class="btn btn-primary full-width">Upload to Job</button>
                         </form>
                     </div>
                 </div>
