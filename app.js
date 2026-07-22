@@ -44,7 +44,8 @@ let state = {
     jobs: [],
     clientPhotos: [],
     transactions: [],
-    activeJobId: null
+    activeJobId: null,
+    ledgerTypeFilter: 'all'
 };
 
 // Initial Load
@@ -65,6 +66,26 @@ async function refreshAllData() {
             fetchClientPhotos(),
             fetchTransactions()
         ]);
+        
+        // Auto-purge soft-deleted transactions older than 30 days
+        const now = new Date();
+        const expiredTxs = state.transactions.filter(t => {
+            if (t.type !== 'Deleted') return false;
+            try {
+                const meta = JSON.parse(t.name);
+                const diffTime = Math.abs(now - new Date(meta.deletedAt));
+                const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                return diffDays >= 30;
+            } catch(e) {
+                return false;
+            }
+        });
+        if (expiredTxs.length > 0) {
+            for (const tx of expiredTxs) {
+                await supabaseClient.from('transactions').delete().eq('id', tx.id);
+            }
+            await fetchTransactions();
+        }
         
         recalculateFinancials();
         renderActiveView();
@@ -285,52 +306,121 @@ function renderDashboard() {
     const tbody = document.getElementById('global-ledger-tbody');
     tbody.innerHTML = '';
 
-    if (state.transactions.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--text-secondary);">No transactions recorded yet.</td></tr>';
-        return;
+    // Exclude soft-deleted transactions from the main list
+    let activeTransactions = state.transactions.filter(t => t.type !== 'Deleted');
+    
+    // Apply type filter
+    if (state.ledgerTypeFilter !== 'all') {
+        activeTransactions = activeTransactions.filter(t => t.type === state.ledgerTypeFilter);
     }
 
-    state.transactions.forEach(t => {
-        const job = state.jobs.find(j => j.id === t.job_id);
-        const jobSuffix = job ? ` (${job.title})` : '';
-        const iconName = getPaymentMethodIcon(t.payment_method);
-        
-        const dateStr = new Date(t.date).toLocaleDateString('en-IN', {
-            day: '2-digit',
-            month: 'short',
-            hour: '2-digit',
-            minute: '2-digit'
+    if (activeTransactions.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--text-secondary);">No transactions match the selected filter.</td></tr>';
+    } else {
+        activeTransactions.forEach(t => {
+            const job = state.jobs.find(j => j.id === t.job_id);
+            const jobSuffix = job ? ` (${job.title})` : '';
+            const iconName = getPaymentMethodIcon(t.payment_method);
+            
+            const dateStr = new Date(t.date).toLocaleDateString('en-IN', {
+                day: '2-digit',
+                month: 'short',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+
+            // Parse Name and Person Name
+            let displayName = t.name;
+            let personSnippet = '';
+            if (t.name.includes(' - By: ')) {
+                const parts = t.name.split(' - By: ');
+                displayName = parts[0];
+                personSnippet = `<span class="person-tag" style="display: block; font-size: 11px; color: var(--text-secondary); margin-top: 2px;"><i data-lucide="user" style="width: 10px; height: 10px; display: inline-block; vertical-align: middle; margin-right: 2px;"></i>${parts[1]}</span>`;
+            }
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${dateStr}</td>
+                <td><strong>${displayName}</strong>${jobSuffix}${personSnippet}</td>
+                <td><span class="pill ${t.type.includes('Inflow') || t.type.includes('Investment') ? 'pill-success' : 'pill-danger'}">${t.type}</span></td>
+                <td><span class="method-tag" style="font-size: 11px;"><i data-lucide="${iconName}" style="width: 12px; height: 12px; vertical-align: middle; margin-right: 2px;"></i>${t.payment_method}</span></td>
+                <td><span class="${t.type.includes('Inflow') || t.type.includes('Investment') ? 'success-text' : 'danger-text'}" style="font-weight: 700;">${formatINR(t.amount)}</span></td>
+                <td>
+                    <div style="display: flex; gap: 4px;">
+                        <button class="btn btn-primary" onclick="event.stopPropagation(); editTransaction('${t.id}')" style="min-height: 28px; padding: 2px 8px; font-size: 11px;">
+                            <i data-lucide="pencil" style="width: 12px; height: 12px;"></i>
+                        </button>
+                        <button class="btn btn-danger" onclick="event.stopPropagation(); deleteTransaction('${t.id}')" style="min-height: 28px; padding: 2px 8px; font-size: 11px; background-color: var(--danger);">
+                            <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i>
+                        </button>
+                    </div>
+                </td>
+            `;
+            tbody.appendChild(tr);
         });
+    }
 
-        // Parse Name and Person Name
-        let displayName = t.name;
-        let personSnippet = '';
-        if (t.name.includes(' - By: ')) {
-            const parts = t.name.split(' - By: ');
-            displayName = parts[0];
-            personSnippet = `<span class="person-tag" style="display: block; font-size: 11px; color: var(--text-secondary); margin-top: 2px;"><i data-lucide="user" style="width: 10px; height: 10px; display: inline-block; vertical-align: middle; margin-right: 2px;"></i>${parts[1]}</span>`;
-        }
+    // Populate Recycle Bin
+    const recycleTbody = document.getElementById('recycle-bin-tbody');
+    recycleTbody.innerHTML = '';
+    
+    const deletedTransactions = state.transactions.filter(t => t.type === 'Deleted');
+    
+    if (deletedTransactions.length === 0) {
+        recycleTbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--text-secondary);">Recycle Bin is empty.</td></tr>';
+    } else {
+        deletedTransactions.forEach(t => {
+            let originalName = t.name;
+            let originalType = '';
+            let deletedAt = new Date().toISOString();
+            let reason = '';
+            
+            try {
+                const meta = JSON.parse(t.name);
+                originalName = meta.originalName;
+                originalType = meta.originalType;
+                deletedAt = meta.deletedAt;
+                reason = meta.reason;
+            } catch(e) {
+                // Fallback
+            }
 
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td>${dateStr}</td>
-            <td><strong>${displayName}</strong>${jobSuffix}${personSnippet}</td>
-            <td><span class="pill ${t.type.includes('Inflow') || t.type.includes('Investment') ? 'pill-success' : 'pill-danger'}">${t.type}</span></td>
-            <td><span class="method-tag" style="font-size: 11px;"><i data-lucide="${iconName}" style="width: 12px; height: 12px; vertical-align: middle; margin-right: 2px;"></i>${t.payment_method}</span></td>
-            <td><span class="${t.type.includes('Inflow') || t.type.includes('Investment') ? 'success-text' : 'danger-text'}" style="font-weight: 700;">${formatINR(t.amount)}</span></td>
-            <td>
-                <div style="display: flex; gap: 4px;">
-                    <button class="btn btn-primary" onclick="event.stopPropagation(); editTransaction('${t.id}')" style="min-height: 28px; padding: 2px 8px; font-size: 11px;">
-                        <i data-lucide="pencil" style="width: 12px; height: 12px;"></i>
-                    </button>
-                    <button class="btn btn-danger" onclick="event.stopPropagation(); deleteTransaction('${t.id}')" style="min-height: 28px; padding: 2px 8px; font-size: 11px; background-color: var(--danger);">
-                        <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i>
-                    </button>
-                </div>
-            </td>
-        `;
-        tbody.appendChild(tr);
-    });
+            const job = state.jobs.find(j => j.id === t.job_id);
+            const jobSuffix = job ? ` (${job.title})` : '';
+
+            const dateDeletedStr = new Date(deletedAt).toLocaleDateString('en-IN', {
+                day: '2-digit',
+                month: 'short',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+
+            // Calculate days left (30 days total)
+            const diffTime = Math.abs(new Date() - new Date(deletedAt));
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+            const daysLeft = Math.max(30 - diffDays, 0);
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${dateDeletedStr}</td>
+                <td><strong>${originalName}</strong>${jobSuffix}</td>
+                <td><span class="pill ${originalType.includes('Inflow') || originalType.includes('Investment') ? 'pill-success' : 'pill-danger'}">${originalType}</span></td>
+                <td style="color: var(--text-secondary); font-style: italic;">"${reason || 'No reason specified'}"</td>
+                <td><span class="pill ${daysLeft > 5 ? 'pill-neutral' : 'pill-danger'}" style="font-weight: 700;">${daysLeft} days left</span></td>
+                <td>
+                    <div style="display: flex; gap: 4px;">
+                        <button class="btn btn-primary" onclick="event.stopPropagation(); restoreTransaction('${t.id}')" style="min-height: 28px; padding: 2px 8px; font-size: 11px; background-color: var(--success); border-color: var(--success);" title="Restore Entry">
+                            <i data-lucide="rotate-ccw" style="width: 12px; height: 12px;"></i> Restore
+                        </button>
+                        <button class="btn btn-danger" onclick="event.stopPropagation(); permanentlyDeleteTransaction('${t.id}')" style="min-height: 28px; padding: 2px 8px; font-size: 11px; background-color: var(--danger);" title="Permanently Delete">
+                            <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i> Purge
+                        </button>
+                    </div>
+                </td>
+            `;
+            recycleTbody.appendChild(tr);
+        });
+    }
 }
 
 // View 2: Clients Directory
@@ -1420,6 +1510,43 @@ function setupEventHandlers() {
         printWindow.document.close();
     });
 
+    // Dashboard ledger type filter dropdown
+    document.getElementById('ledger-type-filter').addEventListener('change', () => {
+        state.ledgerTypeFilter = document.getElementById('ledger-type-filter').value;
+        renderDashboard();
+    });
+
+    // Complete active job button click listener
+    document.getElementById('btn-complete-active-job').addEventListener('click', async () => {
+        if (!state.activeJobId) return;
+        if (confirm("Are you sure you want to mark this project/job as completed?")) {
+            try {
+                // Find active job
+                const job = state.jobs.find(j => j.id === state.activeJobId);
+                if (!job) return;
+
+                // Make all steps completed
+                const steps = (job.milestone_steps || []).map(s => ({
+                    ...s,
+                    completed: true,
+                    timestamp: s.timestamp || new Date().toISOString()
+                }));
+
+                const { error } = await supabaseClient
+                    .from('jobs')
+                    .update({ status: 'Completed', milestone_steps: steps })
+                    .eq('id', state.activeJobId);
+
+                if (error) throw error;
+                showToast('Project completed successfully', 'success');
+                await refreshAllData();
+            } catch (e) {
+                console.error("Complete job error:", e);
+                alert("Error completing job: " + e.message);
+            }
+        }
+    });
+
     // Delete Active Job click listener
     document.getElementById('btn-delete-active-job').addEventListener('click', async () => {
         if (!state.activeJobId) return;
@@ -1455,19 +1582,39 @@ function openTransactionModal(type, title, jobId) {
 }
 
 window.deleteTransaction = async function(txId) {
-    if (confirm("Are you sure you want to delete this transaction record?")) {
-        try {
-            const { error } = await supabaseClient
-                .from('transactions')
-                .delete()
-                .eq('id', txId);
-            if (error) throw error;
-            showToast('Transaction record deleted', 'danger');
-            await refreshAllData();
-        } catch (e) {
-            console.error("Delete transaction error:", e);
-            alert("Error deleting transaction: " + e.message);
-        }
+    const tx = state.transactions.find(t => t.id === txId);
+    if (!tx) return;
+
+    const reason = prompt(`Please enter the reason for deleting the transaction: "${tx.name.split(' - By: ')[0]}"`);
+    if (reason === null) return; // Cancelled
+    
+    if (!reason.trim()) {
+        alert("Deletion cancelled. A reason is required to move an entry to the Recycle Bin.");
+        return;
+    }
+
+    try {
+        const deletionMeta = JSON.stringify({
+            originalName: tx.name,
+            originalType: tx.type,
+            deletedAt: new Date().toISOString(),
+            reason: reason.trim()
+        });
+
+        const { error } = await supabaseClient
+            .from('transactions')
+            .update({
+                type: 'Deleted',
+                name: deletionMeta
+            })
+            .eq('id', txId);
+
+        if (error) throw error;
+        showToast('Transaction moved to Recycle Bin', 'danger');
+        await refreshAllData();
+    } catch (e) {
+        console.error("Soft delete transaction error:", e);
+        alert("Error deleting transaction: " + e.message);
     }
 };
 
@@ -1500,6 +1647,46 @@ window.editTransaction = function(txId) {
     form.dataset.editingId = txId;
 
     document.getElementById('modal-add-transaction').classList.remove('hidden');
+};
+
+window.restoreTransaction = async function(txId) {
+    const tx = state.transactions.find(t => t.id === txId);
+    if (!tx) return;
+
+    try {
+        const meta = JSON.parse(tx.name);
+        const { error } = await supabaseClient
+            .from('transactions')
+            .update({
+                type: meta.originalType,
+                name: meta.originalName
+            })
+            .eq('id', txId);
+
+        if (error) throw error;
+        showToast('Transaction restored successfully', 'success');
+        await refreshAllData();
+    } catch (e) {
+        console.error("Restore transaction error:", e);
+        alert("Error restoring transaction: " + e.message);
+    }
+};
+
+window.permanentlyDeleteTransaction = async function(txId) {
+    if (confirm("Are you sure you want to PERMANENTLY delete this transaction? This action is irreversible.")) {
+        try {
+            const { error } = await supabaseClient
+                .from('transactions')
+                .delete()
+                .eq('id', txId);
+            if (error) throw error;
+            showToast('Transaction permanently deleted', 'danger');
+            await refreshAllData();
+        } catch (e) {
+            console.error("Permanent delete transaction error:", e);
+            alert("Error deleting transaction: " + e.message);
+        }
+    }
 };
 
 window.deleteGalleryPhoto = async function(photoId) {

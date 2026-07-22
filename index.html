@@ -149,7 +149,18 @@
 
             <!-- Unified Transaction History List -->
             <div class="other-expenses-list-box margin-top">
-                <h3>Global Transaction Ledger</h3>
+                <div class="view-header-row" style="margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px; align-items: center;">
+                    <h3 style="margin: 0; border: none; padding: 0;">Global Transaction Ledger</h3>
+                    <div class="select-wrapper" style="width: 160px; margin-left: auto;">
+                        <select id="ledger-type-filter" class="form-select" style="min-height: 32px; font-size: 12px; padding: 4px 8px;">
+                            <option value="all">All Types</option>
+                            <option value="Investment">Investment</option>
+                            <option value="Job Inflow">Job Inflow</option>
+                            <option value="Job Expense">Job Expense</option>
+                            <option value="Other Expense">Other Expense</option>
+                        </select>
+                    </div>
+                </div>
                 <div class="ledger-table-container">
                     <table class="ledger-table">
                         <thead>
@@ -163,6 +174,30 @@
                             </tr>
                         </thead>
                         <tbody id="global-ledger-tbody">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Recycle Bin Section -->
+            <div class="other-expenses-list-box margin-top" style="border: 2px dashed rgba(220, 38, 38, 0.3);">
+                <h3 style="color: var(--danger); display: flex; align-items: center; gap: 6px; border-bottom: 1px solid rgba(220, 38, 38, 0.2); padding-bottom: 8px;">
+                    <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i> Recycle Bin (Soft Deleted Items - 30 Days)
+                </h3>
+                <div class="ledger-table-container">
+                    <table class="ledger-table">
+                        <thead>
+                            <tr>
+                                <th>Date Deleted</th>
+                                <th>Item Description</th>
+                                <th>Original Type</th>
+                                <th>Reason for Deletion</th>
+                                <th>Days Left</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recycle-bin-tbody">
                             <!-- Populated dynamically -->
                         </tbody>
                     </table>
@@ -265,9 +300,14 @@
                                     <h3 id="stepper-job-title">Rebranding Phase 1</h3>
                                     <p id="stepper-job-subtitle">Track progress and mark milestones for Acme Corp.</p>
                                 </div>
-                                <button class="btn btn-danger" id="btn-delete-active-job" style="min-height: 32px; padding: 0 10px; font-size: 12px; background-color: var(--danger);">
-                                    <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i> Delete Job
-                                </button>
+                                <div style="display: flex; gap: 8px;">
+                                    <button class="btn btn-success" id="btn-complete-active-job" style="min-height: 32px; padding: 0 10px; font-size: 12px; background-color: var(--success); border-color: var(--success);">
+                                        <i data-lucide="check-circle" style="width: 14px; height: 14px;"></i> Complete Project
+                                    </button>
+                                    <button class="btn btn-danger" id="btn-delete-active-job" style="min-height: 32px; padding: 0 10px; font-size: 12px; background-color: var(--danger);">
+                                        <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i> Delete Job
+                                    </button>
+                                </div>
                             </div>
                             
                             <div class="stepper-container" id="milestone-stepper">
