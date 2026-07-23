@@ -635,23 +635,71 @@ function renderTracking() {
         return;
     }
 
-    state.jobs.forEach(job => {
-        const client = state.clients.find(c => c.id === job.client_id);
-        const item = document.createElement('div');
-        item.className = `job-select-item ${state.activeJobId === job.id ? 'active' : ''}`;
-        item.innerHTML = `
-            <div>
-                <div class="title">${job.title}</div>
-                <div style="font-size: 11px; color: var(--text-secondary);">${client ? client.name : 'Client'}</div>
-            </div>
-            <span class="pill ${job.status === 'Payment' ? 'pill-success' : 'pill-warning'}" style="font-size: 9px; padding: 2px 4px;">${job.status}</span>
-        `;
-        item.addEventListener('click', () => {
-            state.activeJobId = job.id;
-            renderTracking();
+    const activeJobs = state.jobs.filter(j => j.status !== 'Completed');
+    const pastJobs = state.jobs.filter(j => j.status === 'Completed');
+
+    // Render Active Projects Section
+    const activeHeader = document.createElement('div');
+    activeHeader.style = "font-size: 10px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.05em; padding: 4px; border-bottom: 1px solid var(--border);";
+    activeHeader.textContent = "Active Projects";
+    list.appendChild(activeHeader);
+
+    if (activeJobs.length === 0) {
+        const placeholder = document.createElement('p');
+        placeholder.style = "font-size: 11px; color: var(--text-secondary); padding: 8px; font-style: italic; margin: 0 0 12px 0;";
+        placeholder.textContent = "No active projects";
+        list.appendChild(placeholder);
+    } else {
+        activeJobs.forEach(job => {
+            const client = state.clients.find(c => c.id === job.client_id);
+            const item = document.createElement('div');
+            item.className = `job-select-item ${state.activeJobId === job.id ? 'active' : ''}`;
+            item.innerHTML = `
+                <div>
+                    <div class="title">${job.title}</div>
+                    <div style="font-size: 11px; color: var(--text-secondary);">${client ? client.name : 'Client'}</div>
+                </div>
+                <span class="pill pill-warning" style="font-size: 9px; padding: 2px 4px;">${job.status}</span>
+            `;
+            item.addEventListener('click', () => {
+                state.activeJobId = job.id;
+                renderTracking();
+            });
+            list.appendChild(item);
         });
-        list.appendChild(item);
-    });
+    }
+
+    // Render Past Projects Section
+    const pastHeader = document.createElement('div');
+    pastHeader.style = "font-size: 10px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; margin-top: 16px; margin-bottom: 8px; letter-spacing: 0.05em; padding: 4px; border-bottom: 1px solid var(--border);";
+    pastHeader.textContent = "Past Projects";
+    list.appendChild(pastHeader);
+
+    if (pastJobs.length === 0) {
+        const placeholder = document.createElement('p');
+        placeholder.style = "font-size: 11px; color: var(--text-secondary); padding: 8px; font-style: italic; margin: 0;";
+        placeholder.textContent = "No completed projects yet";
+        list.appendChild(placeholder);
+    } else {
+        pastJobs.forEach(job => {
+            const client = state.clients.find(c => c.id === job.client_id);
+            const item = document.createElement('div');
+            item.className = `job-select-item ${state.activeJobId === job.id ? 'active' : ''}`;
+            item.style.opacity = '0.8';
+            item.innerHTML = `
+                <div>
+                    <div class="title" style="text-decoration: line-through; color: var(--text-secondary);">${job.title}</div>
+                    <div style="font-size: 11px; color: var(--text-secondary);">${client ? client.name : 'Client'}</div>
+                </div>
+                <span class="pill pill-success" style="font-size: 9px; padding: 2px 4px;">Completed</span>
+            `;
+            item.addEventListener('click', () => {
+                state.activeJobId = job.id;
+                renderTracking();
+            });
+            list.appendChild(item);
+        });
+    }
 
     const activeContent = document.getElementById('stepper-active-content');
     const emptyState = document.getElementById('stepper-empty-state');
