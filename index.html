@@ -149,16 +149,38 @@
 
             <!-- Unified Transaction History List -->
             <div class="other-expenses-list-box margin-top">
-                <div class="view-header-row" style="margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px; align-items: center;">
+                <div class="view-header-row" style="margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px; align-items: center; gap: 8px; flex-wrap: wrap;">
                     <h3 style="margin: 0; border: none; padding: 0;">Global Transaction Ledger</h3>
-                    <div class="select-wrapper" style="width: 160px; margin-left: auto;">
-                        <select id="ledger-type-filter" class="form-select" style="min-height: 32px; font-size: 12px; padding: 4px 8px;">
-                            <option value="all">All Types</option>
-                            <option value="Investment">Investment</option>
-                            <option value="Job Inflow">Job Inflow</option>
-                            <option value="Job Expense">Job Expense</option>
-                            <option value="Other Expense">Other Expense</option>
-                        </select>
+                    <div style="display: flex; gap: 8px; margin-left: auto; flex-wrap: wrap;">
+                        <!-- Date Filter -->
+                        <div class="select-wrapper" style="width: 120px;">
+                            <select id="ledger-date-filter" class="form-select" style="min-height: 32px; font-size: 12px; padding: 4px 8px;">
+                                <option value="all">All Time</option>
+                                <option value="today">Today</option>
+                                <option value="this-month">This Month</option>
+                                <option value="last-30-days">Last 30 Days</option>
+                            </select>
+                        </div>
+                        <!-- Type Filter -->
+                        <div class="select-wrapper" style="width: 120px;">
+                            <select id="ledger-type-filter" class="form-select" style="min-height: 32px; font-size: 12px; padding: 4px 8px;">
+                                <option value="all">All Types</option>
+                                <option value="Investment">Investment</option>
+                                <option value="Job Inflow">Job Inflow</option>
+                                <option value="Job Expense">Job Expense</option>
+                                <option value="Other Expense">Other Expense</option>
+                            </select>
+                        </div>
+                        <!-- Method Filter -->
+                        <div class="select-wrapper" style="width: 120px;">
+                            <select id="ledger-method-filter" class="form-select" style="min-height: 32px; font-size: 12px; padding: 4px 8px;">
+                                <option value="all">All Methods</option>
+                                <option value="Cash">Cash</option>
+                                <option value="UPI">UPI</option>
+                                <option value="Card">Card</option>
+                                <option value="Cheque">Cheque</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
                 <div class="ledger-table-container">

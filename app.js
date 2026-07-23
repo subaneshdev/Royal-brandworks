@@ -45,7 +45,9 @@ let state = {
     clientPhotos: [],
     transactions: [],
     activeJobId: null,
-    ledgerTypeFilter: 'all'
+    ledgerTypeFilter: 'all',
+    ledgerDateFilter: 'all',
+    ledgerMethodFilter: 'all'
 };
 
 // Initial Load
@@ -70,9 +72,10 @@ async function refreshAllData() {
         // Auto-purge soft-deleted transactions older than 30 days
         const now = new Date();
         const expiredTxs = state.transactions.filter(t => {
-            if (t.type !== 'Deleted') return false;
+            if (!t.name.startsWith('[DELETED]')) return false;
             try {
-                const meta = JSON.parse(t.name);
+                const jsonStr = t.name.replace('[DELETED] ', '');
+                const meta = JSON.parse(jsonStr);
                 const diffTime = Math.abs(now - new Date(meta.deletedAt));
                 const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
                 return diffDays >= 30;
@@ -126,26 +129,29 @@ function getClientRollup(clientId) {
 }
 
 function recalculateFinancials() {
-    // 1. Revenue: sum of all Job Inflow transactions
-    const totalRevenue = state.transactions
+    // Exclude soft-deleted transactions from totals
+    const activeTxs = state.transactions.filter(t => !t.name.startsWith('[DELETED]'));
+
+    // 1. Revenue: sum of all active Job Inflow transactions
+    const totalRevenue = activeTxs
         .filter(t => t.type === 'Job Inflow')
         .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
 
-    // 2. Working Capital (Job Expense): sum of all Job Expense transactions
-    const workingCapital = state.transactions
+    // 2. Working Capital (Job Expense): sum of all active Job Expense transactions
+    const workingCapital = activeTxs
         .filter(t => t.type === 'Job Expense')
         .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
 
-    // 3. Expense (Utility Expense): sum of all Other Expense transactions
-    const totalExpense = state.transactions
+    // 3. Expense (Utility Expense): sum of all active Other Expense transactions
+    const totalExpense = activeTxs
         .filter(t => t.type === 'Other Expense')
         .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
 
     // 4. Net Profit = Revenue - Working Capital - Expense
     const netProfit = totalRevenue - workingCapital - totalExpense;
 
-    // 5. Investment: sum of all Investment transactions
-    const investment = state.transactions
+    // 5. Investment: sum of all active Investment transactions
+    const investment = activeTxs
         .filter(t => t.type === 'Investment')
         .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
 
@@ -307,15 +313,42 @@ function renderDashboard() {
     tbody.innerHTML = '';
 
     // Exclude soft-deleted transactions from the main list
-    let activeTransactions = state.transactions.filter(t => t.type !== 'Deleted');
+    let activeTransactions = state.transactions.filter(t => !t.name.startsWith('[DELETED]'));
     
     // Apply type filter
     if (state.ledgerTypeFilter !== 'all') {
         activeTransactions = activeTransactions.filter(t => t.type === state.ledgerTypeFilter);
     }
 
+    // Apply date filter
+    if (state.ledgerDateFilter !== 'all') {
+        const now = new Date();
+        if (state.ledgerDateFilter === 'today') {
+            const todayStr = now.toDateString();
+            activeTransactions = activeTransactions.filter(t => new Date(t.date).toDateString() === todayStr);
+        } else if (state.ledgerDateFilter === 'this-month') {
+            const curMonth = now.getMonth();
+            const curYear = now.getFullYear();
+            activeTransactions = activeTransactions.filter(t => {
+                const d = new Date(t.date);
+                return d.getMonth() === curMonth && d.getFullYear() === curYear;
+            });
+        } else if (state.ledgerDateFilter === 'last-30-days') {
+            activeTransactions = activeTransactions.filter(t => {
+                const diff = Math.abs(now - new Date(t.date));
+                const diffDays = diff / (1000 * 60 * 60 * 24);
+                return diffDays <= 30;
+            });
+        }
+    }
+
+    // Apply method filter
+    if (state.ledgerMethodFilter !== 'all') {
+        activeTransactions = activeTransactions.filter(t => t.payment_method === state.ledgerMethodFilter);
+    }
+
     if (activeTransactions.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--text-secondary);">No transactions match the selected filter.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--text-secondary);">No transactions match the selected filters.</td></tr>';
     } else {
         activeTransactions.forEach(t => {
             const job = state.jobs.find(j => j.id === t.job_id);
@@ -364,25 +397,26 @@ function renderDashboard() {
     const recycleTbody = document.getElementById('recycle-bin-tbody');
     recycleTbody.innerHTML = '';
     
-    const deletedTransactions = state.transactions.filter(t => t.type === 'Deleted');
+    const deletedTransactions = state.transactions.filter(t => t.name.startsWith('[DELETED]'));
     
     if (deletedTransactions.length === 0) {
         recycleTbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--text-secondary);">Recycle Bin is empty.</td></tr>';
     } else {
         deletedTransactions.forEach(t => {
             let originalName = t.name;
-            let originalType = '';
+            let originalType = t.type;
             let deletedAt = new Date().toISOString();
             let reason = '';
             
             try {
-                const meta = JSON.parse(t.name);
+                const jsonStr = t.name.replace('[DELETED] ', '');
+                const meta = JSON.parse(jsonStr);
                 originalName = meta.originalName;
-                originalType = meta.originalType;
+                originalType = meta.originalType || t.type;
                 deletedAt = meta.deletedAt;
                 reason = meta.reason;
             } catch(e) {
-                // Fallback
+                // Fallback if not valid JSON
             }
 
             const job = state.jobs.find(j => j.id === t.job_id);
@@ -1516,6 +1550,18 @@ function setupEventHandlers() {
         renderDashboard();
     });
 
+    // Dashboard ledger date filter dropdown
+    document.getElementById('ledger-date-filter').addEventListener('change', () => {
+        state.ledgerDateFilter = document.getElementById('ledger-date-filter').value;
+        renderDashboard();
+    });
+
+    // Dashboard ledger method filter dropdown
+    document.getElementById('ledger-method-filter').addEventListener('change', () => {
+        state.ledgerMethodFilter = document.getElementById('ledger-method-filter').value;
+        renderDashboard();
+    });
+
     // Complete active job button click listener
     document.getElementById('btn-complete-active-job').addEventListener('click', async () => {
         if (!state.activeJobId) return;
@@ -1585,7 +1631,12 @@ window.deleteTransaction = async function(txId) {
     const tx = state.transactions.find(t => t.id === txId);
     if (!tx) return;
 
-    const reason = prompt(`Please enter the reason for deleting the transaction: "${tx.name.split(' - By: ')[0]}"`);
+    let cleanName = tx.name;
+    if (tx.name.includes(' - By: ')) {
+        cleanName = tx.name.split(' - By: ')[0];
+    }
+
+    const reason = prompt(`Please enter the reason for deleting the transaction: "${cleanName}"`);
     if (reason === null) return; // Cancelled
     
     if (!reason.trim()) {
@@ -1594,7 +1645,7 @@ window.deleteTransaction = async function(txId) {
     }
 
     try {
-        const deletionMeta = JSON.stringify({
+        const deletionMeta = `[DELETED] ` + JSON.stringify({
             originalName: tx.name,
             originalType: tx.type,
             deletedAt: new Date().toISOString(),
@@ -1604,7 +1655,6 @@ window.deleteTransaction = async function(txId) {
         const { error } = await supabaseClient
             .from('transactions')
             .update({
-                type: 'Deleted',
                 name: deletionMeta
             })
             .eq('id', txId);
@@ -1654,11 +1704,11 @@ window.restoreTransaction = async function(txId) {
     if (!tx) return;
 
     try {
-        const meta = JSON.parse(tx.name);
+        const jsonStr = tx.name.replace('[DELETED] ', '');
+        const meta = JSON.parse(jsonStr);
         const { error } = await supabaseClient
             .from('transactions')
             .update({
-                type: meta.originalType,
                 name: meta.originalName
             })
             .eq('id', txId);
