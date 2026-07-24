@@ -908,11 +908,13 @@ window.toggleStep = async function(stepIndex) {
     step.completed = !step.completed;
     step.timestamp = step.completed ? new Date().toISOString() : null;
 
-    let newStatus = 'Initial Consultation';
-    for (let i = steps.length - 1; i >= 0; i--) {
-        if (steps[i].completed) {
-            newStatus = steps[i].name;
-            break;
+    let newStatus = job.status === 'Completed' ? 'Completed' : 'Initial Consultation';
+    if (job.status !== 'Completed') {
+        for (let i = steps.length - 1; i >= 0; i--) {
+            if (steps[i].completed) {
+                newStatus = steps[i].name;
+                break;
+            }
         }
     }
 
@@ -945,11 +947,13 @@ window.deleteStep = async function(stepIndex) {
 
     steps.splice(stepIndex, 1);
 
-    let newStatus = 'Initial Consultation';
-    for (let i = steps.length - 1; i >= 0; i--) {
-        if (steps[i].completed) {
-            newStatus = steps[i].name;
-            break;
+    let newStatus = job.status === 'Completed' ? 'Completed' : 'Initial Consultation';
+    if (job.status !== 'Completed') {
+        for (let i = steps.length - 1; i >= 0; i--) {
+            if (steps[i].completed) {
+                newStatus = steps[i].name;
+                break;
+            }
         }
     }
 
