@@ -147,6 +147,32 @@
                 <span>Profit loops back to reinvestment (Working Capital = Investment + Net Profit)</span>
             </div>
 
+            <!-- Partner Equity & Profit Share -->
+            <div class="other-expenses-list-box margin-top">
+                <div class="view-header-row" style="margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <h3 style="margin: 0; border: none; padding: 0;">Partner Equity & Profit Share</h3>
+                    <span class="meta" style="margin-left: 8px;">Initial 25% split for general investments + profit sharing</span>
+                </div>
+                <div class="ledger-table-container">
+                    <table class="ledger-table">
+                        <thead>
+                            <tr>
+                                <th>Partner</th>
+                                <th>Capital Invested</th>
+                                <th>Net Profit Share (25%)</th>
+                                <th>Total Withdrawn</th>
+                                <th>Total Reinvested</th>
+                                <th>Current Equity</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="partner-equity-tbody">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             <!-- Unified Transaction History List -->
             <div class="other-expenses-list-box margin-top">
                 <div class="view-header-row" style="margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px; align-items: center; gap: 8px; flex-wrap: wrap;">
@@ -617,9 +643,23 @@
                     <input type="text" id="transaction-name" class="form-input" placeholder="e.g. UPI received from client, Electricity bill, etc." required>
                 </div>
 
-                <div class="form-group">
+                <div class="form-group" id="transaction-person-group">
                     <label for="transaction-person">Person Name (Paid By / Paid To)</label>
                     <input type="text" id="transaction-person" class="form-input" placeholder="e.g. Subanesh, Vendor Name, Worker Name" required>
+                </div>
+
+                <div class="form-group hidden" id="transaction-partner-group">
+                    <label for="transaction-partner">Partner Name</label>
+                    <div class="select-wrapper">
+                        <select id="transaction-partner" class="form-select">
+                            <option value="">-- Choose Partner --</option>
+                            <option value="General">General / All Partners (Split 25% each)</option>
+                            <option value="Saravanan">Saravanan</option>
+                            <option value="Ganesh">Ganesh</option>
+                            <option value="Oorkavalan">Oorkavalan</option>
+                            <option value="Nithyanandham">Nithyanandham</option>
+                        </select>
+                    </div>
                 </div>
                 
                 <div class="form-group">
@@ -667,6 +707,77 @@
                 </div>
 
                 <button type="submit" class="btn btn-primary full-width">Add Transaction</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Partner Withdraw & Reinvest -->
+    <div class="modal-overlay hidden" id="modal-withdraw-reinvest">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Partner Withdraw &amp; Reinvest</h3>
+                <button class="btn-close" id="btn-close-withdraw-modal"><i data-lucide="x"></i></button>
+            </div>
+            <form id="form-withdraw-reinvest">
+                <input type="hidden" id="withdraw-partner-name">
+                
+                <div class="form-group">
+                    <label>Partner</label>
+                    <input type="text" id="withdraw-partner-display" class="form-input" readonly style="background-color: rgba(255, 255, 255, 0.05); opacity: 0.8;">
+                </div>
+
+                <div class="form-group">
+                    <label for="withdraw-amount">Amount to Withdraw (₹)</label>
+                    <input type="number" id="withdraw-amount" class="form-input" placeholder="0" min="0" step="0.01">
+                    <span class="sub-label" style="font-size: 11px; color: var(--text-secondary);">This reduces your equity capital.</span>
+                </div>
+
+                <div class="form-group">
+                    <label for="reinvest-amount">Amount to Reinvest (₹)</label>
+                    <input type="number" id="reinvest-amount" class="form-input" placeholder="0" min="0" step="0.01">
+                    <span class="sub-label" style="font-size: 11px; color: var(--text-secondary);">This adds to your invested capital.</span>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Payment Method</label>
+                    <div class="payment-method-selector">
+                        <label class="method-option">
+                            <input type="radio" name="withdraw_payment_method" value="Cash" checked>
+                            <div class="option-card">
+                                <i data-lucide="banknote"></i>
+                                <span>Cash</span>
+                            </div>
+                        </label>
+                        <label class="method-option">
+                            <input type="radio" name="withdraw_payment_method" value="UPI">
+                            <div class="option-card">
+                                <i data-lucide="smartphone"></i>
+                                <span>UPI</span>
+                            </div>
+                        </label>
+                        <label class="method-option">
+                            <input type="radio" name="withdraw_payment_method" value="Card">
+                            <div class="option-card">
+                                <i data-lucide="credit-card"></i>
+                                <span>Card</span>
+                            </div>
+                        </label>
+                        <label class="method-option">
+                            <input type="radio" name="withdraw_payment_method" value="Cheque">
+                            <div class="option-card">
+                                <i data-lucide="file-text"></i>
+                                <span>Cheque</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="withdraw-date">Transaction Date (Optional)</label>
+                    <input type="datetime-local" id="withdraw-date" class="form-input">
+                </div>
+
+                <button type="submit" class="btn btn-primary full-width">Submit Distribution</button>
             </form>
         </div>
     </div>

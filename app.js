@@ -172,6 +172,77 @@ function recalculateFinancials() {
     document.getElementById('summary-revenue').textContent = formatINR(totalRevenue);
     document.getElementById('summary-expense').textContent = formatINR(totalExpense);
     document.getElementById('summary-profit').textContent = formatINR(netProfit);
+
+    // Partner Calculations
+    const partners = ['Saravanan', 'Ganesh', 'Oorkavalan', 'Nithyanandham'];
+    const partnerData = {};
+    partners.forEach(p => {
+        partnerData[p] = {
+            name: p,
+            capitalInvested: 0,
+            netProfitShare: 0,
+            withdrawn: 0,
+            reinvested: 0,
+            equity: 0
+        };
+    });
+
+    const investmentTxs = activeTxs.filter(t => t.type === 'Investment');
+    investmentTxs.forEach(t => {
+        const amt = parseFloat(t.amount || 0);
+        let matchedPartner = null;
+        partners.forEach(p => {
+            if (t.name.includes(`- By: ${p}`)) {
+                matchedPartner = p;
+            }
+        });
+
+        if (matchedPartner) {
+            if (amt < 0) {
+                // Withdrawal
+                partnerData[matchedPartner].withdrawn += Math.abs(amt);
+            } else {
+                if (t.name.includes('Reinvestment')) {
+                    partnerData[matchedPartner].reinvested += amt;
+                }
+                partnerData[matchedPartner].capitalInvested += amt;
+            }
+        } else {
+            // General investment - split 25% each
+            partners.forEach(p => {
+                partnerData[p].capitalInvested += amt * 0.25;
+            });
+        }
+    });
+
+    partners.forEach(p => {
+        partnerData[p].netProfitShare = netProfit * 0.25;
+        partnerData[p].equity = partnerData[p].capitalInvested + partnerData[p].netProfitShare - partnerData[p].withdrawn;
+    });
+
+    // Render Partner Equity Table
+    const partnerTbody = document.getElementById('partner-equity-tbody');
+    if (partnerTbody) {
+        partnerTbody.innerHTML = '';
+        partners.forEach(p => {
+            const data = partnerData[p];
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><strong>${data.name}</strong></td>
+                <td><span style="font-weight: 600;">${formatINR(data.capitalInvested)}</span></td>
+                <td><span class="success-text" style="font-weight: 600;">${formatINR(data.netProfitShare)}</span></td>
+                <td><span class="danger-text" style="font-weight: 600;">-${formatINR(data.withdrawn)}</span></td>
+                <td><span class="success-text" style="font-weight: 600;">${formatINR(data.reinvested)}</span></td>
+                <td><span style="font-weight: 700; color: var(--primary);">${formatINR(data.equity)}</span></td>
+                <td>
+                    <button class="btn btn-primary" onclick="openWithdrawModal('${data.name}')" style="min-height: 28px; padding: 2px 8px; font-size: 11px; background-color: #D97706; border-color: #D97706;">
+                        <i data-lucide="arrow-up-right" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle;"></i> Withdraw / Reinvest
+                    </button>
+                </td>
+            `;
+            partnerTbody.appendChild(tr);
+        });
+    }
 }
 
 // Format INR Helper
@@ -1275,8 +1346,15 @@ function setupEventHandlers() {
         const type = document.getElementById('transaction-type').value;
         const jobId = document.getElementById('transaction-job-id').value || null;
         const desc = document.getElementById('transaction-name').value;
-        const person = document.getElementById('transaction-person').value || '';
+        
+        let person = '';
+        if (type === 'Investment') {
+            person = document.getElementById('transaction-partner').value || '';
+        } else {
+            person = document.getElementById('transaction-person').value || '';
+        }
         const name = person ? `${desc} - By: ${person}` : desc;
+        
         const amount = parseFloat(document.getElementById('transaction-amount').value) || 0;
         
         const methodOption = document.querySelector('input[name="payment_method"]:checked');
@@ -1329,6 +1407,68 @@ function setupEventHandlers() {
         document.getElementById('modal-add-transaction').classList.add('hidden');
         form.reset();
         delete form.dataset.editingId;
+        await refreshAllData();
+    });
+
+    // Close withdraw modal handler
+    document.getElementById('btn-close-withdraw-modal').addEventListener('click', () => {
+        document.getElementById('modal-withdraw-reinvest').classList.add('hidden');
+    });
+
+    // Withdraw & Reinvest Form handler
+    document.getElementById('form-withdraw-reinvest').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const partner = document.getElementById('withdraw-partner-name').value;
+        const withdrawAmt = parseFloat(document.getElementById('withdraw-amount').value) || 0;
+        const reinvestAmt = parseFloat(document.getElementById('reinvest-amount').value) || 0;
+
+        const methodOption = document.querySelector('input[name="withdraw_payment_method"]:checked');
+        const method = methodOption ? methodOption.value : 'Cash';
+
+        const customDateVal = document.getElementById('withdraw-date').value;
+        const date = customDateVal ? new Date(customDateVal).toISOString() : new Date().toISOString();
+
+        try {
+            const transactionsToInsert = [];
+            if (withdrawAmt > 0) {
+                transactionsToInsert.push({
+                    id: getUUID(),
+                    job_id: null,
+                    type: 'Investment',
+                    name: `Withdrawal - By: ${partner}`,
+                    amount: -withdrawAmt,
+                    payment_method: method,
+                    date: date
+                });
+            }
+            if (reinvestAmt > 0) {
+                transactionsToInsert.push({
+                    id: getUUID(),
+                    job_id: null,
+                    type: 'Investment',
+                    name: `Reinvestment - By: ${partner}`,
+                    amount: reinvestAmt,
+                    payment_method: method,
+                    date: date
+                });
+            }
+
+            if (transactionsToInsert.length > 0) {
+                const { error } = await supabaseClient
+                    .from('transactions')
+                    .insert(transactionsToInsert);
+                if (error) throw error;
+                showToast('Withdrawal / Reinvestment recorded successfully', 'success');
+            } else {
+                showToast('No amounts entered to distribute', 'neutral');
+            }
+        } catch (err) {
+            console.error("Save withdraw/reinvest error:", err);
+            alert("Error saving: " + err.message);
+        }
+
+        document.getElementById('modal-withdraw-reinvest').classList.add('hidden');
+        document.getElementById('form-withdraw-reinvest').reset();
         await refreshAllData();
     });
 
@@ -1673,7 +1813,26 @@ function openTransactionModal(type, title, jobId) {
     document.getElementById('transaction-job-id').value = jobId || '';
     document.getElementById('transaction-modal-title').textContent = title;
     document.getElementById('transaction-name').value = type === 'Investment' ? 'Investment Inflow' : '';
-    document.getElementById('transaction-person').value = '';
+    
+    const personGroup = document.getElementById('transaction-person-group');
+    const partnerGroup = document.getElementById('transaction-partner-group');
+    const personInput = document.getElementById('transaction-person');
+    const partnerSelect = document.getElementById('transaction-partner');
+
+    if (type === 'Investment') {
+        personGroup.classList.add('hidden');
+        personInput.removeAttribute('required');
+        partnerGroup.classList.remove('hidden');
+        partnerSelect.setAttribute('required', 'required');
+        partnerSelect.value = '';
+    } else {
+        partnerGroup.classList.add('hidden');
+        partnerSelect.removeAttribute('required');
+        personGroup.classList.remove('hidden');
+        personInput.setAttribute('required', 'required');
+        personInput.value = '';
+    }
+
     document.getElementById('transaction-amount').value = '';
     document.getElementById('transaction-date').value = '';
     document.getElementById('modal-add-transaction').classList.remove('hidden');
@@ -1730,14 +1889,42 @@ window.editTransaction = function(txId) {
 
     let displayName = tx.name;
     let personName = '';
-    if (tx.name.includes(' - By: ')) {
-        const parts = tx.name.split(' - By: ');
-        displayName = parts[0];
-        personName = parts[1];
+    
+    const personGroup = document.getElementById('transaction-person-group');
+    const partnerGroup = document.getElementById('transaction-partner-group');
+    const personInput = document.getElementById('transaction-person');
+    const partnerSelect = document.getElementById('transaction-partner');
+
+    if (tx.type === 'Investment') {
+        personGroup.classList.add('hidden');
+        personInput.removeAttribute('required');
+        partnerGroup.classList.remove('hidden');
+        partnerSelect.setAttribute('required', 'required');
+        
+        let matchedPartner = 'General';
+        const partners = ['Saravanan', 'Ganesh', 'Oorkavalan', 'Nithyanandham'];
+        partners.forEach(p => {
+            if (tx.name.includes(`- By: ${p}`)) {
+                matchedPartner = p;
+            }
+        });
+        partnerSelect.value = matchedPartner;
+        displayName = tx.name.split(' - By: ')[0];
+    } else {
+        partnerGroup.classList.add('hidden');
+        partnerSelect.removeAttribute('required');
+        personGroup.classList.remove('hidden');
+        personInput.setAttribute('required', 'required');
+        
+        if (tx.name.includes(' - By: ')) {
+            const parts = tx.name.split(' - By: ');
+            displayName = parts[0];
+            personName = parts[1];
+        }
+        personInput.value = personName;
     }
 
     document.getElementById('transaction-name').value = displayName;
-    document.getElementById('transaction-person').value = personName;
     document.getElementById('transaction-amount').value = tx.amount;
 
     const radios = document.getElementsByName('payment_method');
@@ -1806,4 +1993,13 @@ window.deleteGalleryPhoto = async function(photoId) {
             alert("Error deleting photo: " + e.message);
         }
     }
+};
+
+window.openWithdrawModal = function(partnerName) {
+    document.getElementById('withdraw-partner-name').value = partnerName;
+    document.getElementById('withdraw-partner-display').value = partnerName;
+    document.getElementById('withdraw-amount').value = '';
+    document.getElementById('reinvest-amount').value = '';
+    document.getElementById('withdraw-date').value = '';
+    document.getElementById('modal-withdraw-reinvest').classList.remove('hidden');
 };
