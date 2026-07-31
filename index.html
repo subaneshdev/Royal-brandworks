@@ -137,7 +137,7 @@
                         <i data-lucide="award" class="icon-prof"></i>
                     </div>
                     <span class="value success-text" id="dash-profit">₹ 0</span>
-                    <span class="meta">Revenue - Job Exp - Utility</span>
+                    <span class="meta">Sum of Net Profit of all tasks</span>
                 </div>
             </div>
 
@@ -149,9 +149,14 @@
 
             <!-- Partner Equity & Profit Share -->
             <div class="other-expenses-list-box margin-top">
-                <div class="view-header-row" style="margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px; align-items: center; gap: 8px; flex-wrap: wrap;">
-                    <h3 style="margin: 0; border: none; padding: 0;">Partner Equity & Profit Share</h3>
-                    <span class="meta" style="margin-left: 8px;">Initial 25% split for general investments + profit sharing</span>
+                <div class="view-header-row" style="margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
+                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                        <h3 style="margin: 0; border: none; padding: 0;">Partner Equity & Profit Share</h3>
+                        <span class="meta">Custom percentage split for investments & profit sharing</span>
+                    </div>
+                    <button class="btn btn-secondary" id="btn-edit-partner-shares" style="min-height: 30px; padding: 3px 10px; font-size: 12px;">
+                        <i data-lucide="percent" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle;"></i> Edit Shares (%)
+                    </button>
                 </div>
                 <div class="ledger-table-container">
                     <table class="ledger-table">
@@ -159,7 +164,8 @@
                             <tr>
                                 <th>Partner</th>
                                 <th>Capital Invested</th>
-                                <th>Net Profit Share (25%)</th>
+                                <th>Share %</th>
+                                <th>Net Profit Share</th>
                                 <th>Total Withdrawn</th>
                                 <th>Total Reinvested</th>
                                 <th>Current Equity</th>
@@ -653,7 +659,7 @@
                     <div class="select-wrapper">
                         <select id="transaction-partner" class="form-select">
                             <option value="">-- Choose Partner --</option>
-                            <option value="General">General / All Partners (Split 25% each)</option>
+                            <option value="General">General / All Partners (Split by Partner Shares)</option>
                             <option value="Saravanan">Saravanan</option>
                             <option value="Ganesh">Ganesh</option>
                             <option value="Oorkavalan">Oorkavalan</option>
@@ -778,6 +784,31 @@
                 </div>
 
                 <button type="submit" class="btn btn-primary full-width">Submit Distribution</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Edit Partner Shares (%) -->
+    <div class="modal-overlay hidden" id="modal-partner-shares">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Edit Partner Share Percentages</h3>
+                <button class="btn-close" id="btn-close-partner-shares-modal"><i data-lucide="x"></i></button>
+            </div>
+            <form id="form-partner-shares">
+                <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 16px;">
+                    Set the percentage share for each partner. Total should equal 100%.
+                </p>
+                <div id="partner-shares-inputs" style="display: flex; flex-direction: column; gap: 12px;">
+                    <!-- Populated dynamically -->
+                </div>
+                <div style="margin-top: 14px; font-size: 13px; font-weight: 600; text-align: right; color: var(--text-primary);" id="partner-shares-total-display">
+                    Total: 100%
+                </div>
+                <div class="modal-actions" style="margin-top: 20px;">
+                    <button type="button" class="btn btn-secondary" id="btn-cancel-partner-shares">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Percentages</button>
+                </div>
             </form>
         </div>
     </div>

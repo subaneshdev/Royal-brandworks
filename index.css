@@ -1432,3 +1432,156 @@ body {
         transform: translateY(0);
     }
 }
+
+/* ==========================================
+   MAGIC UI DESIGN SYSTEM ENHANCEMENTS
+   ========================================== */
+
+/* 1. Magic UI Shimmer & Glow Buttons */
+.btn {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #1A1A2E 0%, #2A2A48 100%);
+    box-shadow: 0 4px 14px rgba(26, 26, 46, 0.25);
+}
+
+.btn-primary:hover {
+    transform: translateY(-1.5px);
+    box-shadow: 0 6px 20px rgba(26, 26, 46, 0.35);
+}
+
+.btn::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(
+        60deg,
+        transparent 30%,
+        rgba(255, 255, 255, 0.2) 50%,
+        transparent 70%
+    );
+    transform: rotate(30deg) translateX(-100%);
+    transition: transform 0.6s ease;
+    pointer-events: none;
+}
+
+.btn:hover::after {
+    transform: rotate(30deg) translateX(100%);
+}
+
+/* 2. Magic UI Border Beam & Glass Cards */
+.summary-card,
+.financial-node-card,
+.client-card,
+.workorder-card,
+.other-expenses-list-box {
+    position: relative;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.summary-card:hover,
+.financial-node-card:hover,
+.client-card:hover,
+.workorder-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(255, 107, 0, 0.2);
+}
+
+/* Magic UI Ambient Glow on Active Financial Cards */
+.stat-revenue:hover {
+    box-shadow: 0 10px 25px -5px rgba(23, 138, 76, 0.15), 0 0 0 1px rgba(23, 138, 76, 0.3);
+}
+
+.stat-expense:hover {
+    box-shadow: 0 10px 25px -5px rgba(214, 48, 59, 0.15), 0 0 0 1px rgba(214, 48, 59, 0.3);
+}
+
+.stat-profit:hover {
+    box-shadow: 0 10px 25px -5px rgba(255, 107, 0, 0.2), 0 0 0 1px rgba(255, 107, 0, 0.35);
+}
+
+/* 3. Magic UI Glassmorphism Modals */
+.modal-overlay {
+    backdrop-filter: blur(12px) saturate(180%);
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
+    background: rgba(17, 17, 20, 0.65);
+    transition: opacity 0.3s ease;
+}
+
+.modal-box {
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.4), 0 0 30px rgba(255, 107, 0, 0.08);
+    transform: scale(0.95) translateY(10px);
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+}
+
+.modal-overlay:not(.hidden) .modal-box {
+    transform: scale(1) translateY(0);
+}
+
+/* 4. Magic UI Animated Status Pulse Indicator */
+.pill-success, .pill-neutral {
+    position: relative;
+    padding-left: 18px !important;
+}
+
+.pill-success::before, .pill-neutral::before {
+    content: '';
+    position: absolute;
+    left: 7px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+}
+
+.pill-success::before {
+    background-color: var(--success);
+    box-shadow: 0 0 0 0 rgba(23, 138, 76, 0.7);
+    animation: magic-pulse-green 2s infinite;
+}
+
+.pill-neutral::before {
+    background-color: var(--text-secondary);
+}
+
+@keyframes magic-pulse-green {
+    0% {
+        box-shadow: 0 0 0 0 rgba(23, 138, 76, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 6px rgba(23, 138, 76, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(23, 138, 76, 0);
+    }
+}
+
+/* 5. Magic UI Shiny Text Gradient */
+.shiny-text {
+    background: linear-gradient(
+        120deg,
+        var(--text-primary) 0%,
+        var(--accent) 50%,
+        var(--text-primary) 100%
+    );
+    background-size: 200% auto;
+    color: transparent;
+    -webkit-background-clip: text;
+    background-clip: text;
+    animation: shiny-text-anim 4s linear infinite;
+}
+
+@keyframes shiny-text-anim {
+    0% { background-position: 0% center; }
+    100% { background-position: 200% center; }
+}
+

@@ -47,7 +47,13 @@ let state = {
     activeJobId: null,
     ledgerTypeFilter: 'all',
     ledgerDateFilter: 'all',
-    ledgerMethodFilter: 'all'
+    ledgerMethodFilter: 'all',
+    partnerShares: JSON.parse(localStorage.getItem('partnerShares')) || {
+        'Saravanan': 25,
+        'Ganesh': 25,
+        'Oorkavalan': 25,
+        'Nithyanandham': 25
+    }
 };
 
 // Initial Load
@@ -147,8 +153,14 @@ function recalculateFinancials() {
         .filter(t => t.type === 'Other Expense')
         .reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
 
-    // 4. Net Profit = Revenue - Working Capital - Expense
-    const netProfit = totalRevenue - workingCapital - totalExpense;
+    // 4. Net Profit = sum of net profit of all tasks
+    const netProfit = state.jobs.reduce((sum, j) => {
+        let p = parseFloat(j.profit);
+        if (isNaN(p)) {
+            p = (parseFloat(j.budget || 0) - parseFloat(j.expense || 0));
+        }
+        return sum + p;
+    }, 0);
 
     // 5. Investment: sum of all active Investment transactions
     const investment = activeTxs
@@ -168,22 +180,24 @@ function recalculateFinancials() {
         runningCapital
     };
 
-    // Update sticky summary strip
-    document.getElementById('summary-revenue').textContent = formatINR(totalRevenue);
-    document.getElementById('summary-expense').textContent = formatINR(totalExpense);
-    document.getElementById('summary-profit').textContent = formatINR(netProfit);
+    // Update sticky summary strip with Magic UI Number Ticker transition
+    animateCounter('summary-revenue', totalRevenue);
+    animateCounter('summary-expense', totalExpense);
+    animateCounter('summary-profit', netProfit);
 
     // Partner Calculations
     const partners = ['Saravanan', 'Ganesh', 'Oorkavalan', 'Nithyanandham'];
     const partnerData = {};
     partners.forEach(p => {
+        const sharePct = state.partnerShares && state.partnerShares[p] !== undefined ? parseFloat(state.partnerShares[p]) : 25;
         partnerData[p] = {
             name: p,
             capitalInvested: 0,
             netProfitShare: 0,
             withdrawn: 0,
             reinvested: 0,
-            equity: 0
+            equity: 0,
+            sharePct: sharePct
         };
     });
 
@@ -208,15 +222,17 @@ function recalculateFinancials() {
                 partnerData[matchedPartner].capitalInvested += amt;
             }
         } else {
-            // General investment - split 25% each
+            // General investment - split according to partner share percentage
             partners.forEach(p => {
-                partnerData[p].capitalInvested += amt * 0.25;
+                const pct = (partnerData[p].sharePct || 25) / 100;
+                partnerData[p].capitalInvested += amt * pct;
             });
         }
     });
 
     partners.forEach(p => {
-        partnerData[p].netProfitShare = netProfit * 0.25;
+        const pct = (partnerData[p].sharePct || 25) / 100;
+        partnerData[p].netProfitShare = netProfit * pct;
         partnerData[p].equity = partnerData[p].capitalInvested + partnerData[p].netProfitShare - partnerData[p].withdrawn;
     });
 
@@ -230,6 +246,7 @@ function recalculateFinancials() {
             tr.innerHTML = `
                 <td><strong>${data.name}</strong></td>
                 <td><span style="font-weight: 600;">${formatINR(data.capitalInvested)}</span></td>
+                <td><span style="font-weight: 600; color: var(--primary);">${data.sharePct}%</span></td>
                 <td><span class="success-text" style="font-weight: 600;">${formatINR(data.netProfitShare)}</span></td>
                 <td><span class="danger-text" style="font-weight: 600;">-${formatINR(data.withdrawn)}</span></td>
                 <td><span class="success-text" style="font-weight: 600;">${formatINR(data.reinvested)}</span></td>
@@ -253,6 +270,39 @@ function formatINR(number) {
         currency: 'INR',
         maximumFractionDigits: 0
     }).format(parsed);
+}
+
+// Magic UI Number Ticker Animation Helper
+function animateCounter(elementId, targetValue) {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+    const target = parseFloat(targetValue) || 0;
+    
+    // Parse current numeric value from element text
+    const currentText = el.textContent ? el.textContent.replace(/[^0-9.-]+/g, "") : "0";
+    const start = parseFloat(currentText) || 0;
+    
+    if (Math.abs(start - target) < 1) {
+        el.textContent = formatINR(target);
+        return;
+    }
+    
+    const duration = 600;
+    const startTime = performance.now();
+    
+    function updateCount(currentTime) {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const easeProgress = 1 - Math.pow(1 - progress, 3);
+        const currentValue = start + (target - start) * easeProgress;
+        el.textContent = formatINR(currentValue);
+        if (progress < 1) {
+            requestAnimationFrame(updateCount);
+        } else {
+            el.textContent = formatINR(target);
+        }
+    }
+    requestAnimationFrame(updateCount);
 }
 
 // Helper to convert files to Base64 URL
@@ -372,12 +422,12 @@ function renderDashboard() {
     const financials = state.overallFinancials;
     if (!financials) return;
 
-    document.getElementById('dash-investment').textContent = formatINR(financials.investment);
-    document.getElementById('dash-working-capital').textContent = formatINR(financials.workingCapital);
-    document.getElementById('dash-running-capital').textContent = formatINR(financials.runningCapital);
-    document.getElementById('dash-revenue').textContent = formatINR(financials.revenue);
-    document.getElementById('dash-expense').textContent = formatINR(financials.expense);
-    document.getElementById('dash-profit').textContent = formatINR(financials.profit);
+    animateCounter('dash-investment', financials.investment);
+    animateCounter('dash-working-capital', financials.workingCapital);
+    animateCounter('dash-running-capital', financials.runningCapital);
+    animateCounter('dash-revenue', financials.revenue);
+    animateCounter('dash-expense', financials.expense);
+    animateCounter('dash-profit', financials.profit);
 
     // Populate Global Transaction Ledger
     const tbody = document.getElementById('global-ledger-tbody');
@@ -1804,6 +1854,102 @@ function setupEventHandlers() {
             }
         }
     });
+
+    // Partner Share Edit Modal handlers
+    const btnEditShares = document.getElementById('btn-edit-partner-shares');
+    if (btnEditShares) {
+        btnEditShares.addEventListener('click', () => {
+            openPartnerSharesModal();
+        });
+    }
+
+    const btnCloseSharesModal = document.getElementById('btn-close-partner-shares-modal');
+    if (btnCloseSharesModal) {
+        btnCloseSharesModal.addEventListener('click', () => {
+            document.getElementById('modal-partner-shares').classList.add('hidden');
+        });
+    }
+
+    const btnCancelShares = document.getElementById('btn-cancel-partner-shares');
+    if (btnCancelShares) {
+        btnCancelShares.addEventListener('click', () => {
+            document.getElementById('modal-partner-shares').classList.add('hidden');
+        });
+    }
+
+    const formShares = document.getElementById('form-partner-shares');
+    if (formShares) {
+        formShares.addEventListener('submit', (e) => {
+            e.preventDefault();
+            savePartnerShares();
+        });
+    }
+}
+
+function openPartnerSharesModal() {
+    const partners = ['Saravanan', 'Ganesh', 'Oorkavalan', 'Nithyanandham'];
+    const container = document.getElementById('partner-shares-inputs');
+    if (!container) return;
+
+    container.innerHTML = '';
+    partners.forEach(p => {
+        const val = state.partnerShares && state.partnerShares[p] !== undefined ? state.partnerShares[p] : 25;
+        const div = document.createElement('div');
+        div.className = 'form-group';
+        div.style.marginBottom = '0';
+        div.innerHTML = `
+            <label for="share-pct-${p}" style="font-weight: 500;">${p} (%)</label>
+            <input type="number" id="share-pct-${p}" class="form-input partner-share-input" data-partner="${p}" value="${val}" min="0" max="100" step="0.1" required>
+        `;
+        container.appendChild(div);
+    });
+
+    updatePartnerSharesTotalDisplay();
+
+    const inputs = container.querySelectorAll('.partner-share-input');
+    inputs.forEach(input => {
+        input.addEventListener('input', updatePartnerSharesTotalDisplay);
+    });
+
+    document.getElementById('modal-partner-shares').classList.remove('hidden');
+}
+
+function updatePartnerSharesTotalDisplay() {
+    const inputs = document.querySelectorAll('.partner-share-input');
+    let total = 0;
+    inputs.forEach(input => {
+        total += parseFloat(input.value || 0);
+    });
+    const display = document.getElementById('partner-shares-total-display');
+    if (display) {
+        display.textContent = `Total: ${total.toFixed(1)}%`;
+        display.style.color = Math.abs(total - 100) < 0.01 ? 'var(--success)' : 'var(--danger)';
+    }
+}
+
+function savePartnerShares() {
+    const partners = ['Saravanan', 'Ganesh', 'Oorkavalan', 'Nithyanandham'];
+    const newShares = {};
+    let total = 0;
+
+    partners.forEach(p => {
+        const input = document.getElementById(`share-pct-${p}`);
+        const val = parseFloat(input ? input.value : 25) || 0;
+        newShares[p] = val;
+        total += val;
+    });
+
+    if (Math.abs(total - 100) > 0.01) {
+        if (!confirm(`The total percentage is ${total.toFixed(1)}%, which does not equal 100%. Do you still want to save?`)) {
+            return;
+        }
+    }
+
+    state.partnerShares = newShares;
+    localStorage.setItem('partnerShares', JSON.stringify(newShares));
+    recalculateFinancials();
+    document.getElementById('modal-partner-shares').classList.add('hidden');
+    showToast('Partner share percentages updated successfully', 'success');
 }
 
 function openTransactionModal(type, title, jobId) {
