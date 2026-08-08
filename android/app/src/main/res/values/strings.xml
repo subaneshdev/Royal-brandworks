@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Royal Brandworks</string>
+    <string name="title_activity_main">Royal Brandworks</string>
+    <string name="package_name">com.royalbrandworks.app</string>
+    <string name="custom_url_scheme">com.royalbrandworks.app</string>
+</resources>

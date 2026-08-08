@@ -236,6 +236,8 @@ function recalculateFinancials() {
         partnerData[p].equity = partnerData[p].capitalInvested + partnerData[p].netProfitShare - partnerData[p].withdrawn;
     });
 
+    state.partnerData = partnerData;
+
     // Render Partner Equity Table
     const partnerTbody = document.getElementById('partner-equity-tbody');
     if (partnerTbody) {
@@ -1407,6 +1409,18 @@ function setupEventHandlers() {
         
         const amount = parseFloat(document.getElementById('transaction-amount').value) || 0;
         
+        // Enforce limit if it is a negative investment (withdrawal) or if transaction desc has "Withdrawal"
+        if (type === 'Investment' && amount < 0) {
+            const pData = state.partnerData && state.partnerData[person];
+            if (pData) {
+                const maxWithdrawable = Math.max(0, pData.capitalInvested - pData.withdrawn);
+                if (Math.abs(amount) > maxWithdrawable) {
+                    showToast(`Error: ${person} cannot withdraw more than their remaining invested capital of ${formatINR(maxWithdrawable)}.`, 'danger');
+                    return;
+                }
+            }
+        }
+        
         const methodOption = document.querySelector('input[name="payment_method"]:checked');
         const method = methodOption ? methodOption.value : 'Cash';
         
@@ -1471,6 +1485,14 @@ function setupEventHandlers() {
         const partner = document.getElementById('withdraw-partner-name').value;
         const withdrawAmt = parseFloat(document.getElementById('withdraw-amount').value) || 0;
         const reinvestAmt = parseFloat(document.getElementById('reinvest-amount').value) || 0;
+
+        // Limit validation: Only the amount they have added as investment they can withdraw
+        const pData = state.partnerData && state.partnerData[partner];
+        const maxWithdrawable = pData ? Math.max(0, pData.capitalInvested - pData.withdrawn) : 0;
+        if (withdrawAmt > maxWithdrawable) {
+            showToast(`Error: ${partner} cannot withdraw more than their remaining invested capital of ${formatINR(maxWithdrawable)}.`, 'danger');
+            return;
+        }
 
         const methodOption = document.querySelector('input[name="withdraw_payment_method"]:checked');
         const method = methodOption ? methodOption.value : 'Cash';
@@ -2144,7 +2166,20 @@ window.deleteGalleryPhoto = async function(photoId) {
 window.openWithdrawModal = function(partnerName) {
     document.getElementById('withdraw-partner-name').value = partnerName;
     document.getElementById('withdraw-partner-display').value = partnerName;
-    document.getElementById('withdraw-amount').value = '';
+    
+    const pData = state.partnerData && state.partnerData[partnerName];
+    const maxWithdrawable = pData ? Math.max(0, pData.capitalInvested - pData.withdrawn) : 0;
+    
+    const withdrawInput = document.getElementById('withdraw-amount');
+    withdrawInput.value = '';
+    withdrawInput.placeholder = `Max: ₹${Math.floor(maxWithdrawable).toLocaleString('en-IN')}`;
+    withdrawInput.max = maxWithdrawable;
+
+    const subLabel = document.querySelector('#withdraw-amount ~ .sub-label');
+    if (subLabel) {
+        subLabel.textContent = `Limit: ${formatINR(maxWithdrawable)}. Only the amount added as investment can be withdrawn.`;
+    }
+    
     document.getElementById('reinvest-amount').value = '';
     document.getElementById('withdraw-date').value = '';
     document.getElementById('modal-withdraw-reinvest').classList.remove('hidden');

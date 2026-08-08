@@ -1,0 +1,6 @@
+{
+  "appId": "com.royalbrandworks.app",
+  "appName": "Royal Brandworks",
+  "webDir": "www",
+  "bundledWebRuntime": false
+}

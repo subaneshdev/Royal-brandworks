@@ -3,6 +3,12 @@
   "version": "1.0.0",
   "description": "Royal Brandworks internal business management application",
   "scripts": {
-    "dev": "npx -y serve -l 8081 ."
+    "dev": "npx -y serve -l 8081 .",
+    "build": "mkdir -p www && cp index.html app.js index.css logo.jpg www/"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/cli": "^8.5.0",
+    "@capacitor/core": "^8.5.0"
   }
 }
